@@ -4,7 +4,10 @@ mod arch;
 
 pub use arch::*;
 
-use core::marker::PhantomData;
+use core::{
+    marker::PhantomData,
+    ops::{Index, IndexMut},
+};
 
 /// 最小的分页大小。
 ///
@@ -200,6 +203,11 @@ impl<Meta: MmuMeta> MmuFlags<Meta> {
     pub const ZERO: Self = Self(0, PhantomData);
 
     #[inline]
+    pub const fn new(value: usize) -> Self {
+        Self(value, PhantomData)
+    }
+
+    #[inline]
     pub fn is_leaf(self) -> bool {
         Meta::is_leaf(self.0)
     }
@@ -260,8 +268,13 @@ impl<Meta: MmuMeta> PageTable<Meta> {
     pub const ZERO: Self = Self([Pte::ZERO; ENTRIES_PER_TABLE]);
 
     #[inline]
-    pub fn set_entry(&mut self, index: usize, entry: Pte<Meta>) {
-        self.0[index] = entry;
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        !self.0.iter().any(|pte| pte.is_valid())
     }
 
     pub fn query(&self, addr: VAddr, level: u8) -> QueryPte<Meta> {
@@ -278,6 +291,22 @@ impl<Meta: MmuMeta> PageTable<Meta> {
         } else {
             QueryPte::SubTable(pte.ppn())
         }
+    }
+}
+
+impl<Meta: MmuMeta> Index<usize> for PageTable<Meta> {
+    type Output = Pte<Meta>;
+
+    #[inline]
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.0[index]
+    }
+}
+
+impl<Meta: MmuMeta> IndexMut<usize> for PageTable<Meta> {
+    #[inline]
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.0[index]
     }
 }
 

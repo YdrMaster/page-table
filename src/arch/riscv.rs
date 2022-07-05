@@ -35,12 +35,12 @@ impl<const N: usize> MmuMeta for Sv<N> {
 
     #[inline]
     fn ppn(value: usize) -> PPN {
-        PPN((value >> 10) << OFFSET_BITS)
+        PPN((value >> 10) & PPN_MASK)
     }
 
     #[inline]
-    fn set_ppn(value: &mut usize, paddr: PPN) {
-        *value |= ((paddr.0 >> OFFSET_BITS) & PPN_MASK) << 10;
+    fn set_ppn(value: &mut usize, ppn: PPN) {
+        *value |= (ppn.0 & PPN_MASK) << 10;
     }
 
     #[inline]
