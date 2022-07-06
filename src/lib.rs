@@ -1,9 +1,24 @@
 #![no_std]
+#![deny(warnings, unsafe_code)]
 
-mod arch;
 mod flags;
 mod page_table;
 mod pte;
+
+cfg_if::cfg_if! {
+    if #[cfg(any(target_arch = "riscv64", target_arch = "riscv32"))] {
+        #[path = "arch/riscv.rs"]
+        mod arch;
+    } else if #[cfg(target_arch = "aarch64")] {
+        #[path = "arch/arm.rs"]
+        mod arch;
+    } else if #[cfg(target_arch = "x86_64")] {
+        #[path = "arch/x86.rs"]
+        mod arch;
+    } else {
+        compile_error!("Unsupported architecture");
+    }
+}
 
 pub use arch::*;
 pub use flags::MmuFlags;

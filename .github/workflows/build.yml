@@ -24,13 +24,19 @@ jobs:
           toolchain: nightly
           components: rustfmt, clippy
           target: ${{ matrix.target }}
-      - uses: actions-rs/cargo@v1
+
+      - name: Check format
+        uses: actions-rs/cargo@v1
         with:
           command: fmt
           args: -- --check
-      - uses: actions-rs/cargo@v1
+
+      - name: Build
+        uses: actions-rs/cargo@v1
         with:
           command: build
-      - uses: actions-rs/cargo@v1
+
+      - name: Clippy
+        uses: actions-rs/cargo@v1
         with:
           command: clippy
