@@ -1,13 +1,14 @@
 #![no_std]
 
 mod arch;
+mod flags;
+mod page_table;
+mod pte;
 
 pub use arch::*;
-
-use core::{
-    marker::PhantomData,
-    ops::{Index, IndexMut},
-};
+pub use flags::MmuFlags;
+pub use page_table::{PageTable, PtQuery};
+pub use pte::Pte;
 
 /// 最小的分页大小。
 ///
@@ -34,40 +35,47 @@ pub struct PPN(pub usize);
 /// 虚拟地址。
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(transparent)]
-pub struct VAddr(pub usize);
+pub struct VAddr(usize);
 
-/// 页表项。
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-#[repr(transparent)]
-pub struct Pte<Meta: MmuMeta>(pub usize, PhantomData<Meta>);
+impl VAddr {
+    #[inline]
+    pub const fn new(value: usize) -> Self {
+        Self(value)
+    }
 
-/// MMU 属性。
-///
-/// MMU 属性一定完全包含在页表项中，所以独立的 MMU 属性实现为一个无法获取地址的页表项。
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-#[repr(transparent)]
-pub struct MmuFlags<Meta: MmuMeta>(pub usize, PhantomData<Meta>);
+    #[inline]
+    pub const fn value(self) -> usize {
+        self.0
+    }
+}
 
-/// 页表。
-#[repr(C, align(4096))]
-pub struct PageTable<Meta: MmuMeta>([Pte<Meta>; ENTRIES_PER_TABLE]);
+impl From<usize> for VAddr {
+    #[inline]
+    fn from(value: usize) -> Self {
+        Self(value)
+    }
+}
 
-/// 查询结果。
-#[derive(Clone, Copy, Debug)]
-pub enum QueryPte<Meta: MmuMeta> {
-    /// 虚存对应的页表项不存在。
-    Invalid,
-    /// 下一级页表的物理地址。
-    SubTable(PPN),
-    /// 页表项。
-    Leaf(Pte<Meta>),
+impl<T> From<*const T> for VAddr {
+    #[inline]
+    fn from(value: *const T) -> Self {
+        Self(value as _)
+    }
+}
+
+impl<T> From<&T> for VAddr {
+    #[inline]
+    fn from(value: &T) -> Self {
+        Self(value as *const _ as _)
+    }
 }
 
 /// 分页元数据。
 pub trait MmuMeta: Copy {
     const ADDR_MASK: usize;
 
-    const MAX_LEVEL: usize;
+    const V_ADDR_BITS: usize;
+    const MAX_LEVEL: usize = calculate_max_level(Self::V_ADDR_BITS);
     const FLAG_POS_V: usize;
     const FLAG_POS_R: usize;
     const FLAG_POS_W: usize;
@@ -131,197 +139,9 @@ pub trait MmuMeta: Copy {
     fn clear_ppn(value: &mut usize);
 }
 
-impl<Meta: MmuMeta> Pte<Meta> {
-    pub const ZERO: Self = Self(0, PhantomData);
-
-    #[inline]
-    pub fn ppn(self) -> PPN {
-        Meta::ppn(self.0)
-    }
-
-    #[inline]
-    pub fn is_leaf(self) -> bool {
-        Meta::is_leaf(self.0)
-    }
-
-    #[inline]
-    pub fn is_huge(self, level: usize) -> bool {
-        Meta::is_huge(self.0, level)
-    }
-
-    #[inline]
-    pub fn is_valid(self) -> bool {
-        Meta::is_valid(self.0)
-    }
-
-    #[inline]
-    pub fn is_readable(self) -> bool {
-        Meta::is_readable(self.0)
-    }
-
-    #[inline]
-    pub fn is_writable(self) -> bool {
-        Meta::is_writable(self.0)
-    }
-
-    #[inline]
-    pub fn is_executable(self) -> bool {
-        Meta::is_executable(self.0)
-    }
-
-    #[inline]
-    pub fn is_user(self) -> bool {
-        Meta::is_user(self.0)
-    }
-
-    #[inline]
-    pub fn is_global(self) -> bool {
-        Meta::is_global(self.0)
-    }
-
-    #[inline]
-    pub fn is_accessed(self) -> bool {
-        Meta::is_accessed(self.0)
-    }
-
-    #[inline]
-    pub fn is_dirty(self) -> bool {
-        Meta::is_dirty(self.0)
-    }
-
-    #[inline]
-    pub fn set_ppn(&mut self, ppn: PPN) {
-        Meta::clear_ppn(&mut self.0);
-        Meta::set_ppn(&mut self.0, ppn);
-    }
-
-    #[inline]
-    pub fn flags(mut self) -> MmuFlags<Meta> {
-        Meta::clear_ppn(&mut self.0);
-        MmuFlags(self.0, PhantomData)
-    }
-}
-
-impl<Meta: MmuMeta> MmuFlags<Meta> {
-    pub const ZERO: Self = Self(0, PhantomData);
-
-    #[inline]
-    pub const fn new(value: usize) -> Self {
-        Self(value, PhantomData)
-    }
-
-    #[inline]
-    pub fn is_leaf(self) -> bool {
-        Meta::is_leaf(self.0)
-    }
-
-    #[inline]
-    pub fn is_huge(self, level: usize) -> bool {
-        Meta::is_huge(self.0, level)
-    }
-
-    #[inline]
-    pub fn is_valid(self) -> bool {
-        Meta::is_valid(self.0)
-    }
-
-    #[inline]
-    pub fn is_readable(self) -> bool {
-        Meta::is_readable(self.0)
-    }
-
-    #[inline]
-    pub fn is_writable(self) -> bool {
-        Meta::is_writable(self.0)
-    }
-
-    #[inline]
-    pub fn is_executable(self) -> bool {
-        Meta::is_executable(self.0)
-    }
-
-    #[inline]
-    pub fn is_user(self) -> bool {
-        Meta::is_user(self.0)
-    }
-
-    #[inline]
-    pub fn is_global(self) -> bool {
-        Meta::is_global(self.0)
-    }
-
-    #[inline]
-    pub fn is_accessed(self) -> bool {
-        Meta::is_accessed(self.0)
-    }
-
-    #[inline]
-    pub fn is_dirty(self) -> bool {
-        Meta::is_dirty(self.0)
-    }
-
-    #[inline]
-    pub fn build_pte(mut self, ppn: PPN) -> Pte<Meta> {
-        Meta::set_ppn(&mut self.0, ppn);
-        Pte(self.0, PhantomData)
-    }
-}
-
-impl<Meta: MmuMeta> PageTable<Meta> {
-    pub const ZERO: Self = Self([Pte::ZERO; ENTRIES_PER_TABLE]);
-
-    #[inline]
-    pub fn len(&self) -> usize {
-        self.0.len()
-    }
-
-    #[inline]
-    pub fn is_empty(&self) -> bool {
-        !self.0.iter().any(|pte| pte.is_valid())
-    }
-
-    pub fn set_entry(&mut self, vaddr: VAddr, entry: Pte<Meta>, level: usize) -> bool {
-        if level >= Meta::MAX_LEVEL {
-            return false;
-        }
-
-        let vpn = (vaddr.0 >> (OFFSET_BITS + level * PT_LEVEL_BITS)) & PT_LEVEL_MASK;
-        self.0[vpn] = entry;
-
-        true
-    }
-
-    pub fn query(&self, addr: VAddr, level: u8) -> QueryPte<Meta> {
-        let mut idx = addr.0 >> OFFSET_BITS;
-        for _ in 0..level {
-            idx >>= PT_LEVEL_BITS;
-        }
-        idx &= (1 << PT_LEVEL_BITS) - 1;
-        let pte = self.0[idx];
-        if !pte.is_valid() {
-            QueryPte::Invalid
-        } else if pte.is_leaf() {
-            QueryPte::Leaf(pte)
-        } else {
-            QueryPte::SubTable(pte.ppn())
-        }
-    }
-}
-
-impl<Meta: MmuMeta> Index<usize> for PageTable<Meta> {
-    type Output = Pte<Meta>;
-
-    #[inline]
-    fn index(&self, index: usize) -> &Self::Output {
-        &self.0[index]
-    }
-}
-
-impl<Meta: MmuMeta> IndexMut<usize> for PageTable<Meta> {
-    #[inline]
-    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        &mut self.0[index]
-    }
+#[inline]
+const fn calculate_max_level(v_addr_bits: usize) -> usize {
+    (v_addr_bits - OFFSET_BITS + PT_LEVEL_BITS - 1) / PT_LEVEL_BITS - 1
 }
 
 use static_assertions::const_assert_eq;
@@ -331,9 +151,15 @@ const_assert_eq!(OFFSET_BITS, 12);
 
 cfg_if::cfg_if! {
     if #[cfg(target_pointer_width = "32")] {
+        const_assert_eq!(PT_LEVEL_BITS, 10);
         const_assert_eq!(ENTRIES_PER_TABLE, 1024);
+        const_assert_eq!(calculate_max_level(32), 1);
     } else if #[cfg(target_pointer_width = "64")] {
+        const_assert_eq!(PT_LEVEL_BITS, 9);
         const_assert_eq!(ENTRIES_PER_TABLE, 512);
+        const_assert_eq!(calculate_max_level(39), 2);
+        const_assert_eq!(calculate_max_level(48), 3);
+        const_assert_eq!(calculate_max_level(57), 4);
     } else {
         compile_error!("Unsupported architecture");
     }

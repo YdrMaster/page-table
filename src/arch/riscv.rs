@@ -1,4 +1,4 @@
-﻿use crate::{MmuMeta, Pte, OFFSET_BITS, PPN, PT_LEVEL_BITS};
+﻿use crate::{MmuMeta, Pte, OFFSET_BITS, PPN};
 
 cfg_if::cfg_if! {
     if #[cfg(target_pointer_width = "32")] {
@@ -16,7 +16,7 @@ cfg_if::cfg_if! {
 pub struct Sv<const N: usize>;
 
 impl<const N: usize> MmuMeta for Sv<N> {
-    const MAX_LEVEL: usize = ((N - OFFSET_BITS) / PT_LEVEL_BITS) as _;
+    const V_ADDR_BITS: usize = N;
     const ADDR_MASK: usize = addr_mask(10, N - OFFSET_BITS);
     const FLAG_POS_V: usize = 0;
     const FLAG_POS_R: usize = 1;
