@@ -18,6 +18,12 @@ pub enum PtQuery<Meta: MmuMeta> {
     Leaf(Pte<Meta>),
 }
 
+#[derive(Clone, Copy, Debug)]
+pub enum EntryError {
+    InvalidLevel,
+    LeafMisaligned,
+}
+
 impl<Meta: MmuMeta> PageTable<Meta> {
     pub const ZERO: Self = Self([Pte::ZERO; ENTRIES_PER_TABLE]);
 
@@ -31,15 +37,27 @@ impl<Meta: MmuMeta> PageTable<Meta> {
         !self.0.iter().any(|pte| pte.is_valid())
     }
 
-    pub fn set_entry(&mut self, vaddr: VAddr, entry: Pte<Meta>, level: usize) -> bool {
+    #[inline]
+    pub fn as_ptr(&self) -> *const Pte<Meta> {
+        self.0.as_ptr()
+    }
+
+    pub fn set_entry(
+        &mut self,
+        vaddr: VAddr,
+        entry: Pte<Meta>,
+        level: usize,
+    ) -> Result<(), EntryError> {
         if level > Meta::MAX_LEVEL {
-            return false;
+            Err(EntryError::InvalidLevel)?;
         }
-
-        let vpn = (vaddr.0 >> (OFFSET_BITS + level * PT_LEVEL_BITS)) & PT_LEVEL_MASK;
+        let page_align = level * PT_LEVEL_BITS;
+        if entry.is_huge(level) && (entry.ppn().0.trailing_zeros() as usize) < page_align {
+            Err(EntryError::LeafMisaligned)?;
+        }
+        let vpn = (vaddr.0 >> (OFFSET_BITS + page_align)) & PT_LEVEL_MASK;
         self.0[vpn] = entry;
-
-        true
+        Ok(())
     }
 
     pub fn query(&self, addr: VAddr, level: u8) -> PtQuery<Meta> {

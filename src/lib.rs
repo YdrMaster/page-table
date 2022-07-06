@@ -104,7 +104,7 @@ pub trait MmuMeta: Copy {
 
     #[inline]
     fn is_huge(value: usize, level: usize) -> bool {
-        level < Self::MAX_LEVEL && Self::is_leaf(value)
+        level != 0 && Self::is_leaf(value)
     }
 
     fn ppn(value: usize) -> PPN;
