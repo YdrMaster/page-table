@@ -21,7 +21,10 @@ pub const OFFSET_BITS: usize = PAGE_SIZE.trailing_zeros() as _;
 const ENTRIES_PER_TABLE: usize = PAGE_SIZE / core::mem::size_of::<usize>();
 
 /// 每级页表的序号位数
-const PT_LEVEL_BITS: usize = ENTRIES_PER_TABLE.trailing_zeros() as _;
+pub const PT_LEVEL_BITS: usize = ENTRIES_PER_TABLE.trailing_zeros() as _;
+
+/// 序号遮罩
+const PT_LEVEL_MASK: usize = (1 << PT_LEVEL_BITS) - 1;
 
 /// 物理地址。
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -275,6 +278,17 @@ impl<Meta: MmuMeta> PageTable<Meta> {
     #[inline]
     pub fn is_empty(&self) -> bool {
         !self.0.iter().any(|pte| pte.is_valid())
+    }
+
+    pub fn set_entry(&mut self, vaddr: VAddr, entry: Pte<Meta>, level: usize) -> bool {
+        if level >= Meta::MAX_LEVEL {
+            return false;
+        }
+
+        let vpn = (vaddr.0 >> (OFFSET_BITS + level * PT_LEVEL_BITS)) & PT_LEVEL_MASK;
+        self.0[vpn] = entry;
+
+        true
     }
 
     pub fn query(&self, addr: VAddr, level: u8) -> QueryPte<Meta> {
