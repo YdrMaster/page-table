@@ -53,11 +53,14 @@ pub struct PPN(pub usize);
 pub struct VAddr(usize);
 
 impl VAddr {
+    /// 将一个地址值转换为虚拟地址意味着允许虚存方案根据实际情况裁剪地址值。
+    /// 超过虚址范围的地址会被裁剪。
     #[inline]
     pub const fn new(value: usize) -> Self {
         Self(value)
     }
 
+    /// 获得虚地址的地址值。
     #[inline]
     pub const fn value(self) -> usize {
         self.0
@@ -87,10 +90,25 @@ impl<T> From<&T> for VAddr {
 
 /// 分页元数据。
 pub trait MmuMeta: Copy {
-    const ADDR_MASK: usize;
+    /// 物理地址位数，用于计算物理页号形式。
+    const P_ADDR_BITS: usize;
 
+    /// 虚拟页号位数，用于裁剪或扩展正确的虚址。
     const V_ADDR_BITS: usize;
+
+    /// 物理地址在 PTE 中的位置。
+    const PPN_BASE: usize;
+
+    /// 从 PTE 中遮罩出 PPN，用于修改 PPN。
+    ///
+    /// ## NOTE
+    ///
+    /// 永远不必设置这个常量，因为它是自动计算的。
+    const PPN_MASK: usize = ppn_mask(Self::PPN_BASE, Self::P_ADDR_BITS - OFFSET_BITS);
+
+    /// 通过虚址位数计算页表最大级别。
     const MAX_LEVEL: usize = calculate_max_level(Self::V_ADDR_BITS);
+
     const FLAG_POS_V: usize;
     const FLAG_POS_R: usize;
     const FLAG_POS_W: usize;
@@ -100,63 +118,100 @@ pub trait MmuMeta: Copy {
     const FLAG_POS_A: usize;
     const FLAG_POS_D: usize;
 
+    /// 如果页表项指向物理页，则返回 `true`。
+    ///
+    /// ## NOTE
+    ///
+    /// 为了零开销抽象，这个方法的实现可能不会判断 PTE 是否 valid。
     fn is_leaf(value: usize) -> bool;
 
+    /// 判断页表项指向的是一个大于 0 级（4 kiB）的物理页。
+    ///
+    /// ## NOTE
+    ///
+    /// 为了零开销抽象，这个方法的实现可能不会判断 PTE 是否 valid。
     #[inline]
     fn is_huge(value: usize, level: usize) -> bool {
         level != 0 && Self::is_leaf(value)
     }
 
-    fn ppn(value: usize) -> PPN;
-
+    /// 判断页表项是否 valid。
     #[inline]
     fn is_valid(value: usize) -> bool {
         value & (1 << Self::FLAG_POS_D) != 0
     }
 
+    /// 判断页表项是否可读。
     #[inline]
     fn is_readable(value: usize) -> bool {
         value & (1 << Self::FLAG_POS_R) != 0
     }
 
+    /// 判断页表项是否可写。
     #[inline]
     fn is_writable(value: usize) -> bool {
         value & (1 << Self::FLAG_POS_W) != 0
     }
 
+    /// 判断页表项是否可执行。
     #[inline]
     fn is_executable(value: usize) -> bool {
         value & (1 << Self::FLAG_POS_X) != 0
     }
 
+    /// 判断页表项是否用于用户态。
     #[inline]
     fn is_user(value: usize) -> bool {
         value & (1 << Self::FLAG_POS_U) != 0
     }
 
+    /// 判断页表项是否全局的。
     #[inline]
     fn is_global(value: usize) -> bool {
         value & (1 << Self::FLAG_POS_G) != 0
     }
 
+    /// 判断页表项是否访问过。
     #[inline]
     fn is_accessed(value: usize) -> bool {
         value & (1 << Self::FLAG_POS_A) != 0
     }
 
+    /// 判断页表项是否被修改过。
     #[inline]
     fn is_dirty(value: usize) -> bool {
         value & (1 << Self::FLAG_POS_D) != 0
     }
 
-    fn set_ppn(value: &mut usize, ppn: PPN);
+    /// 从 PTE 中获得 PPN。
+    #[inline]
+    fn ppn(value: usize) -> PPN {
+        PPN((value & Self::PPN_MASK) >> Self::PPN_BASE)
+    }
 
-    fn clear_ppn(value: &mut usize);
+    /// 设置页表项的 ppn。
+    #[inline]
+    fn set_ppn(value: &mut usize, ppn: PPN) {
+        *value |= (ppn.0 << Self::PPN_BASE) & Self::PPN_MASK;
+    }
+
+    /// 清除页表项中的 ppn。
+    #[inline]
+    fn clear_ppn(value: &mut usize) {
+        *value &= !Self::PPN_MASK;
+    }
 }
 
 #[inline]
 const fn calculate_max_level(v_addr_bits: usize) -> usize {
     (v_addr_bits - OFFSET_BITS + PT_LEVEL_BITS - 1) / PT_LEVEL_BITS - 1
+}
+
+#[inline]
+const fn ppn_mask(base: usize, len: usize) -> usize {
+    let m0: usize = !((1 << base) - 1);
+    let m1: usize = (1 << (base + len)) - 1;
+    m0 & m1
 }
 
 use static_assertions::const_assert_eq;
