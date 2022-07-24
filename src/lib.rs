@@ -1,5 +1,7 @@
+//! x
+
 #![no_std]
-#![deny(warnings, unsafe_code)]
+#![deny(warnings, unsafe_code, unstable_features, missing_docs)]
 
 mod flags;
 mod page_table;
@@ -109,13 +111,28 @@ pub trait MmuMeta: Copy {
     /// 通过虚址位数计算页表最大级别。
     const MAX_LEVEL: usize = calculate_max_level(Self::V_ADDR_BITS);
 
+    /// 页表项有效。
     const FLAG_POS_V: usize;
+
+    /// 页可读。
     const FLAG_POS_R: usize;
+
+    /// 页可写。
     const FLAG_POS_W: usize;
+
+    /// 页可执行。
     const FLAG_POS_X: usize;
+
+    /// 页可用户态访问。
     const FLAG_POS_U: usize;
+
+    /// 全局页。
     const FLAG_POS_G: usize;
+
+    /// 页已访问。
     const FLAG_POS_A: usize;
+
+    /// 页已写。
     const FLAG_POS_D: usize;
 
     /// 如果页表项指向物理页，则返回 `true`。

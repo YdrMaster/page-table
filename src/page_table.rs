@@ -25,23 +25,37 @@ pub enum EntryError {
 }
 
 impl<Meta: MmuMeta> PageTable<Meta> {
+    /// 空白页表。
     pub const ZERO: Self = Self([Pte::ZERO; ENTRIES_PER_TABLE]);
 
+    /// 页表长度。
+    ///
+    /// 总长度，而非有效项的数量。这是一个常量。
     #[inline]
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         self.0.len()
     }
 
+    /// 如果页表中至少一个项有效，返回 `true`。
     #[inline]
     pub fn is_empty(&self) -> bool {
         !self.0.iter().any(|pte| pte.is_valid())
     }
 
+    /// 获取指向第一个页表项的指针。
     #[inline]
     pub fn as_ptr(&self) -> *const Pte<Meta> {
         self.0.as_ptr()
     }
 
+    /// 将此页表视为一个 `level` 级页表，设置一个页表项。
+    ///
+    /// 页表项保证查找虚地址 `vaddr` 时能找到页表项 `entry` 指向的物理页（可以是页或子页表）。
+    ///
+    /// # Errors
+    ///
+    /// - 如果 `level` 大于当前方案下最大的页表级别，产生 [`InvalidLevel`](EntryError::InvalidLevel)；
+    /// - 如果 `entry` 在 `level` 级页表中表示一个巨页但物理页号未对齐，产生 [`LeafMisaligned`](EntryError::LeafMisaligned)；
     pub fn set_entry(
         &mut self,
         vaddr: VAddr,
@@ -60,13 +74,10 @@ impl<Meta: MmuMeta> PageTable<Meta> {
         Ok(())
     }
 
-    pub fn query(&self, addr: VAddr, level: u8) -> PtQuery<Meta> {
-        let mut idx = addr.0 >> OFFSET_BITS;
-        for _ in 0..level {
-            idx >>= PT_LEVEL_BITS;
-        }
-        idx &= (1 << PT_LEVEL_BITS) - 1;
-        let pte = self.0[idx];
+    /// 查询页表一次。
+    pub fn query_once(&self, addr: VAddr, level: u8) -> PtQuery<Meta> {
+        let vpn = addr.0 >> (OFFSET_BITS + level as usize * PT_LEVEL_BITS);
+        let pte = self.0[vpn & ((1 << PT_LEVEL_BITS) - 1)];
         if !pte.is_valid() {
             PtQuery::Invalid
         } else if pte.is_leaf() {
