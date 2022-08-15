@@ -1,6 +1,4 @@
-﻿use crate::{
-    MmuMeta, Pte, VAddr, ENTRIES_PER_TABLE, OFFSET_BITS, PPN, PT_LEVEL_BITS, PT_LEVEL_MASK,
-};
+﻿use crate::{MmuMeta, Pte, VAddr, ENTRIES_PER_TABLE, PPN, PT_LEVEL_BITS};
 use core::ops::{Index, IndexMut};
 
 /// 页表。
@@ -69,15 +67,13 @@ impl<Meta: MmuMeta> PageTable<Meta> {
         if entry.is_huge(level) && (entry.ppn().0.trailing_zeros() as usize) < page_align {
             Err(EntryError::LeafMisaligned)?;
         }
-        let vpn = (vaddr.0 >> (OFFSET_BITS + page_align)) & PT_LEVEL_MASK;
-        self.0[vpn] = entry;
+        self.0[vaddr.floor().index(level)] = entry;
         Ok(())
     }
 
     /// 查询页表一次。
-    pub fn query_once(&self, addr: VAddr, level: u8) -> PtQuery<Meta> {
-        let vpn = addr.0 >> (OFFSET_BITS + level as usize * PT_LEVEL_BITS);
-        let pte = self.0[vpn & ((1 << PT_LEVEL_BITS) - 1)];
+    pub fn query_once(&self, vaddr: VAddr, level: usize) -> PtQuery<Meta> {
+        let pte = self.0[vaddr.floor().index(level)];
         if !pte.is_valid() {
             PtQuery::Invalid
         } else if pte.is_leaf() {

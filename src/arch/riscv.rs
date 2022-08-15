@@ -1,11 +1,15 @@
 ﻿cfg_if::cfg_if! {
     if #[cfg(target_pointer_width = "32")] {
         const P_ADDR_BITS: usize = 34;
+        /// RISC-V Sv32 VM Mode.
         pub type Sv32 = Sv<32>;
     } else if #[cfg(target_pointer_width = "64")] {
         const P_ADDR_BITS: usize = 56;
+        /// RISC-V Sv39 VM Mode.
         pub type Sv39 = Sv<39>;
+        /// RISC-V Sv48 VM Mode.
         pub type Sv48 = Sv<48>;
+        /// RISC-V Sv57 VM Mode.
         pub type Sv57 = Sv<57>;
     }
 }

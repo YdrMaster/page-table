@@ -3,6 +3,7 @@
 #![no_std]
 #![deny(warnings, unsafe_code, unstable_features, missing_docs)]
 
+mod addr;
 mod flags;
 mod page_table;
 mod pte;
@@ -22,6 +23,7 @@ cfg_if::cfg_if! {
     }
 }
 
+pub use addr::{VAddr, PPN, VPN};
 pub use arch::*;
 pub use flags::MmuFlags;
 pub use page_table::{PageTable, PtQuery};
@@ -40,55 +42,6 @@ const ENTRIES_PER_TABLE: usize = PAGE_SIZE / core::mem::size_of::<usize>();
 
 /// 每级页表的序号位数
 pub const PT_LEVEL_BITS: usize = ENTRIES_PER_TABLE.trailing_zeros() as _;
-
-/// 序号遮罩
-const PT_LEVEL_MASK: usize = (1 << PT_LEVEL_BITS) - 1;
-
-/// 物理地址。
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-#[repr(transparent)]
-pub struct PPN(pub usize);
-
-/// 虚拟地址。
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-#[repr(transparent)]
-pub struct VAddr(usize);
-
-impl VAddr {
-    /// 将一个地址值转换为虚拟地址意味着允许虚存方案根据实际情况裁剪地址值。
-    /// 超过虚址范围的地址会被裁剪。
-    #[inline]
-    pub const fn new(value: usize) -> Self {
-        Self(value)
-    }
-
-    /// 获得虚地址的地址值。
-    #[inline]
-    pub const fn value(self) -> usize {
-        self.0
-    }
-}
-
-impl From<usize> for VAddr {
-    #[inline]
-    fn from(value: usize) -> Self {
-        Self(value)
-    }
-}
-
-impl<T> From<*const T> for VAddr {
-    #[inline]
-    fn from(value: *const T) -> Self {
-        Self(value as _)
-    }
-}
-
-impl<T> From<&T> for VAddr {
-    #[inline]
-    fn from(value: &T) -> Self {
-        Self(value as *const _ as _)
-    }
-}
 
 /// 分页元数据。
 pub trait MmuMeta: Copy {
@@ -155,7 +108,7 @@ pub trait MmuMeta: Copy {
     /// 判断页表项是否 valid。
     #[inline]
     fn is_valid(value: usize) -> bool {
-        value & (1 << Self::FLAG_POS_D) != 0
+        value & (1 << Self::FLAG_POS_V) != 0
     }
 
     /// 判断页表项是否可读。
