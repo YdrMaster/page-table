@@ -1,4 +1,4 @@
-﻿use crate::{PAGE_BITS, PT_LEVEL_BITS};
+﻿use crate::{mask, PAGE_BITS, PT_LEVEL_BITS, P_ADDR_BITS};
 use core::ops::{Add, AddAssign};
 
 /// 物理页号。
@@ -10,7 +10,7 @@ impl PPN {
     /// 最小物理页号。
     pub const MIN: Self = PPN(0);
     /// 最大物理页号。
-    pub const MAX: Self = PPN((1 << (crate::P_ADDR_BITS - PAGE_BITS)) - 1);
+    pub const MAX: Self = PPN(mask(P_ADDR_BITS - PAGE_BITS));
 }
 
 impl Add<usize> for PPN {
@@ -44,9 +44,14 @@ impl VPN {
 
     /// 虚页在 `level` 级页表中的位置。
     #[inline]
-    pub const fn index(self, level: usize) -> usize {
-        const MASK: usize = (1 << PT_LEVEL_BITS) - 1;
-        (self.0 >> (level * PT_LEVEL_BITS)) & MASK
+    pub const fn index_in(self, level: usize) -> usize {
+        (self.0 >> (level * PT_LEVEL_BITS)) & mask(PT_LEVEL_BITS)
+    }
+
+    /// 虚页在 `level` 级页上的偏移。
+    #[inline]
+    pub const fn offset_in(self, level: usize) -> usize {
+        self.0 & mask(level * PT_LEVEL_BITS)
     }
 }
 
@@ -87,7 +92,7 @@ impl VAddr {
     /// 调用者需要确保虚地址在当前地址空间中。
     #[allow(unsafe_code)]
     #[inline]
-    pub unsafe fn as_ptr<T>(self) -> *const T {
+    pub const unsafe fn as_ptr<T>(self) -> *const T {
         self.0 as _
     }
 
@@ -111,7 +116,7 @@ impl VAddr {
     /// 不包括这个虚地址的最前页的页号。
     #[inline]
     pub const fn ceil(self) -> VPN {
-        VPN((self.0 + (1 << PAGE_BITS) - 1) >> PAGE_BITS)
+        VPN((self.0 + mask(PAGE_BITS)) >> PAGE_BITS)
     }
 }
 

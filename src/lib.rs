@@ -1,12 +1,13 @@
 //! x
 
 #![no_std]
-#![deny(warnings, unsafe_code, unstable_features, missing_docs)]
+// #![deny(warnings, unsafe_code, unstable_features, missing_docs)]
 
 mod addr;
 mod flags;
 mod page_table;
 mod pte;
+pub mod walker;
 
 cfg_if::cfg_if! {
     if #[cfg(any(target_arch = "riscv64", target_arch = "riscv32"))] {
@@ -44,7 +45,7 @@ const ENTRIES_PER_TABLE: usize = PAGE_SIZE / core::mem::size_of::<usize>();
 pub const PT_LEVEL_BITS: usize = ENTRIES_PER_TABLE.trailing_zeros() as _;
 
 /// 分页元数据。
-pub trait MmuMeta: Copy {
+pub trait MmuMeta: 'static + Copy {
     /// 物理地址位数，用于计算物理页号形式。
     const P_ADDR_BITS: usize;
 
@@ -91,7 +92,7 @@ pub trait MmuMeta: Copy {
     /// `level` 级页表容纳的页数。
     #[inline]
     fn pages_in(level: usize) -> usize {
-        1 << (level * PT_LEVEL_BITS)
+        1 << ((level + 1) * PT_LEVEL_BITS)
     }
 
     /// 如果页表项指向物理页，则返回 `true`。
@@ -184,9 +185,14 @@ const fn calculate_max_level(v_addr_bits: usize) -> usize {
 }
 
 #[inline]
+const fn mask(bits: usize) -> usize {
+    (1 << bits) - 1
+}
+
+#[inline]
 const fn ppn_mask(base: usize, len: usize) -> usize {
-    let m0: usize = !((1 << base) - 1);
-    let m1: usize = (1 << (base + len)) - 1;
+    let m0: usize = !mask(base);
+    let m1: usize = mask(base + len);
     m0 & m1
 }
 

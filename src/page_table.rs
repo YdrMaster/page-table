@@ -46,6 +46,12 @@ impl<Meta: MmuMeta> PageTable<Meta> {
         self.0.as_ptr()
     }
 
+    // 获取页表项。
+    #[inline]
+    pub(crate) fn get_mut(&mut self, index: usize) -> Option<&mut Pte<Meta>> {
+        self.0.get_mut(index)
+    }
+
     /// 将此页表视为一个 `level` 级页表，设置一个页表项。
     ///
     /// 页表项保证查找虚地址 `vaddr` 时能找到页表项 `entry` 指向的物理页（可以是页或子页表）。
@@ -67,14 +73,14 @@ impl<Meta: MmuMeta> PageTable<Meta> {
         if entry.is_huge(level) && (entry.ppn().0.trailing_zeros() as usize) < page_align {
             Err(EntryError::LeafMisaligned)?;
         }
-        self.0[vaddr.floor().index(level)] = entry;
+        self.0[vaddr.floor().index_in(level)] = entry;
         Ok(())
     }
 
     /// 查询页表一次。
     #[inline]
     pub fn query_once(&self, vaddr: VAddr, level: usize) -> PtQuery<Meta> {
-        self.0[vaddr.floor().index(level)].into()
+        self.0[vaddr.floor().index_in(level)].into()
     }
 
     /// 返回一个遍历并擦除页表的迭代器。
