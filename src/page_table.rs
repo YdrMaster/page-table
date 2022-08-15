@@ -72,15 +72,15 @@ impl<Meta: MmuMeta> PageTable<Meta> {
     }
 
     /// 查询页表一次。
+    #[inline]
     pub fn query_once(&self, vaddr: VAddr, level: usize) -> PtQuery<Meta> {
-        let pte = self.0[vaddr.floor().index(level)];
-        if !pte.is_valid() {
-            PtQuery::Invalid
-        } else if pte.is_leaf() {
-            PtQuery::Leaf(pte)
-        } else {
-            PtQuery::SubTable(pte.ppn())
-        }
+        self.0[vaddr.floor().index(level)].into()
+    }
+
+    /// 返回一个遍历并擦除页表的迭代器。
+    #[inline]
+    pub fn erase(&mut self) -> Eraser<'_, Meta> {
+        Eraser(self, 0)
     }
 }
 
@@ -97,5 +97,37 @@ impl<Meta: MmuMeta> IndexMut<usize> for PageTable<Meta> {
     #[inline]
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
         &mut self.0[index]
+    }
+}
+
+/// 擦除迭代器。
+pub struct Eraser<'a, Meta: MmuMeta>(&'a mut PageTable<Meta>, usize);
+
+impl<'a, Meta: MmuMeta> Iterator for Eraser<'a, Meta> {
+    type Item = PtQuery<Meta>;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        while let Some(ans) = self.0 .0.get_mut(self.1) {
+            let ans = core::mem::replace(ans, Pte::ZERO);
+            match PtQuery::from(ans) {
+                PtQuery::Invalid => {}
+                query => return Some(query),
+            }
+        }
+        None
+    }
+}
+
+impl<Meta: MmuMeta> From<Pte<Meta>> for PtQuery<Meta> {
+    #[inline]
+    fn from(pte: Pte<Meta>) -> Self {
+        if !pte.is_valid() {
+            PtQuery::Invalid
+        } else if pte.is_leaf() {
+            PtQuery::Leaf(pte)
+        } else {
+            PtQuery::SubTable(pte.ppn())
+        }
     }
 }

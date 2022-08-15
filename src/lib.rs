@@ -88,6 +88,12 @@ pub trait MmuMeta: Copy {
     /// 页已写。
     const FLAG_POS_D: usize;
 
+    /// `level` 级页表容纳的页数。
+    #[inline]
+    fn pages_in(level: usize) -> usize {
+        1 << (level * PT_LEVEL_BITS)
+    }
+
     /// 如果页表项指向物理页，则返回 `true`。
     ///
     /// ## NOTE

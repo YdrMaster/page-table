@@ -1,12 +1,37 @@
 ﻿use crate::{PAGE_BITS, PT_LEVEL_BITS};
+use core::ops::{Add, AddAssign};
 
 /// 物理页号。
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 #[repr(transparent)]
 pub struct PPN(pub usize);
 
+impl PPN {
+    /// 最小物理页号。
+    pub const MIN: Self = PPN(0);
+    /// 最大物理页号。
+    pub const MAX: Self = PPN((1 << (crate::P_ADDR_BITS - PAGE_BITS)) - 1);
+}
+
+impl Add<usize> for PPN {
+    type Output = Self;
+
+    #[inline]
+    fn add(mut self, rhs: usize) -> Self {
+        self += rhs;
+        self
+    }
+}
+
+impl AddAssign<usize> for PPN {
+    #[inline]
+    fn add_assign(&mut self, rhs: usize) {
+        self.0 += rhs;
+    }
+}
+
 /// 虚拟页号。
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 #[repr(transparent)]
 pub struct VPN(pub usize);
 
@@ -25,8 +50,25 @@ impl VPN {
     }
 }
 
+impl Add<usize> for VPN {
+    type Output = Self;
+
+    #[inline]
+    fn add(mut self, rhs: usize) -> Self {
+        self += rhs;
+        self
+    }
+}
+
+impl AddAssign<usize> for VPN {
+    #[inline]
+    fn add_assign(&mut self, rhs: usize) {
+        self.0 += rhs;
+    }
+}
+
 /// 虚拟地址。
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 #[repr(transparent)]
 pub struct VAddr(usize);
 
