@@ -1,6 +1,6 @@
 [package]
 name = "page-table"
-description = "Definations of the page table for common architectures."
+description = "Encapsulation of the page table for common architectures."
 version = "0.0.4"
 edition = "2021"
 authors = ["YdrMaster <ydrml@hotmail.com>"]

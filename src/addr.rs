@@ -1,4 +1,4 @@
-﻿use crate::{OFFSET_BITS, PT_LEVEL_BITS};
+﻿use crate::{PAGE_BITS, PT_LEVEL_BITS};
 
 /// 物理页号。
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -14,14 +14,14 @@ impl VPN {
     /// 虚页的起始地址。
     #[inline]
     pub const fn base(self) -> VAddr {
-        VAddr(self.0 << OFFSET_BITS)
+        VAddr(self.0 << PAGE_BITS)
     }
 
     /// 虚页在 `level` 级页表中的位置。
     #[inline]
     pub const fn index(self, level: usize) -> usize {
         const MASK: usize = (1 << PT_LEVEL_BITS) - 1;
-        (self.0 >> level * PT_LEVEL_BITS) & MASK
+        (self.0 >> (level * PT_LEVEL_BITS)) & MASK
     }
 }
 
@@ -63,13 +63,13 @@ impl VAddr {
     /// 包括这个虚地址最后页的页号。
     #[inline]
     pub const fn floor(self) -> VPN {
-        VPN(self.0 >> OFFSET_BITS)
+        VPN(self.0 >> PAGE_BITS)
     }
 
     /// 不包括这个虚地址的最前页的页号。
     #[inline]
     pub const fn ceil(self) -> VPN {
-        VPN((self.0 + (1 << OFFSET_BITS) - 1) >> OFFSET_BITS)
+        VPN((self.0 + (1 << PAGE_BITS) - 1) >> PAGE_BITS)
     }
 }
 

@@ -35,7 +35,7 @@ pub use pte::Pte;
 pub const PAGE_SIZE: usize = 4096;
 
 /// 页内偏移的位数
-pub const OFFSET_BITS: usize = PAGE_SIZE.trailing_zeros() as _;
+pub const PAGE_BITS: usize = PAGE_SIZE.trailing_zeros() as _;
 
 /// 每级页表容纳的页数
 const ENTRIES_PER_TABLE: usize = PAGE_SIZE / core::mem::size_of::<usize>();
@@ -59,7 +59,7 @@ pub trait MmuMeta: Copy {
     /// ## NOTE
     ///
     /// 永远不必设置这个常量，因为它是自动计算的。
-    const PPN_MASK: usize = ppn_mask(Self::PPN_BASE, Self::P_ADDR_BITS - OFFSET_BITS);
+    const PPN_MASK: usize = ppn_mask(Self::PPN_BASE, Self::P_ADDR_BITS - PAGE_BITS);
 
     /// 通过虚址位数计算页表最大级别。
     const MAX_LEVEL: usize = calculate_max_level(Self::V_ADDR_BITS);
@@ -174,7 +174,7 @@ pub trait MmuMeta: Copy {
 
 #[inline]
 const fn calculate_max_level(v_addr_bits: usize) -> usize {
-    (v_addr_bits - OFFSET_BITS + PT_LEVEL_BITS - 1) / PT_LEVEL_BITS - 1
+    (v_addr_bits - PAGE_BITS + PT_LEVEL_BITS - 1) / PT_LEVEL_BITS - 1
 }
 
 #[inline]
@@ -187,7 +187,7 @@ const fn ppn_mask(base: usize, len: usize) -> usize {
 use static_assertions::const_assert_eq;
 
 const_assert_eq!(PAGE_SIZE, 4096);
-const_assert_eq!(OFFSET_BITS, 12);
+const_assert_eq!(PAGE_BITS, 12);
 
 cfg_if::cfg_if! {
     if #[cfg(target_pointer_width = "32")] {

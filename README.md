@@ -6,10 +6,10 @@
 [![Documentation](https://docs.rs/page-table/badge.svg)](https://docs.rs/page-table)
 [![issue](https://img.shields.io/github/issues/YdrMaster/page-table)](https://github.com/YdrMaster/page-table/issues)
 
-对页表的构建和查询建立抽象。
+封装页表的构建和查询操作。
 
 架构支持：
 
 - [x] RISC-V
-- [ ] x86
-- [ ] arm
+- [ ] x86_64
+- [ ] aarch64
