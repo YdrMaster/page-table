@@ -5,22 +5,34 @@ use core::marker::PhantomData;
 
 /// `Meta` 方案的页表访问机制。
 pub trait Visitor<Meta: MmuMeta> {
-    /// 在访问 `target` 的过程中，访问一个 `level` 级页表项 `pte`。
+    /// 从根页表出发时调用一次，设置第一个目标。
+    fn start(&mut self) -> Pos<Meta>;
+
+    /// 到达 `target_hint` 节点。
+    fn arrive(&mut self, pte: &mut Pte<Meta>, target_hint: Pos<Meta>) -> Pos<Meta>;
+
+    /// 在访问 `target` 的过程中，经过一个包括 `target` 的 `level` 级页表项 `pte`。
     ///
-    /// 以下 3 种情况会调用这个方法：
+    /// 以下两种情况会调用这个方法：
     ///
-    /// - 访问到目标页表项；
     /// - 访问到包含目标虚页的大页节点；
     /// - 访问到包含目标虚页的无效节点；
-    fn walk(&mut self, level: usize, target: &mut Pos<Meta>, pte: &mut Pte<Meta>);
+    fn meet(&mut self, level: usize, pte: Pte<Meta>, target_hint: Pos<Meta>) -> Update<Meta>;
 
-    /// 将一个物理页号转换为当前地址空间的虚页号。
-    ///
-    /// 当访问目标虚页的过程中遇到中间页表时调用这个方法。
+    /// 在访问目标节点的过程中，经过一个位于 `ppn` 物理页中间页表，需要计算这个物理页的虚页号。
     fn translate(&self, ppn: PPN) -> VPN;
 }
 
+/// 遍历中断时的更新方案。
+pub enum Update<Meta: MmuMeta> {
+    /// 修改目标。
+    Target(Pos<Meta>),
+    /// 新建中间页表。
+    Pte(Pte<Meta>, VPN),
+}
+
 /// `Meta` 方案中页表上的一个位置。
+#[derive(Clone, Copy)]
 pub struct Pos<Meta: MmuMeta> {
     /// 目标页表项包含的一个虚页号。
     pub vpn: VPN,
@@ -30,59 +42,72 @@ pub struct Pos<Meta: MmuMeta> {
 }
 
 impl<Meta: MmuMeta> Pos<Meta> {
-    /// 根页表的位置。
-    pub const ROOT: Self = Self {
-        vpn: VPN(0),
-        level: Meta::MAX_LEVEL,
-        _phantom: PhantomData,
-    };
+    /// 新建目标。
+    #[inline]
+    pub const fn new(vpn: VPN, level: usize) -> Self {
+        Self {
+            vpn,
+            level,
+            _phantom: PhantomData,
+        }
+    }
+
+    /// 结束遍历。
+    #[inline]
+    pub const fn stop() -> Self {
+        Self {
+            vpn: VPN(0),
+            level: Meta::MAX_LEVEL + 1,
+            _phantom: PhantomData,
+        }
+    }
 
     /// 向前移动一页。
     #[inline]
-    pub fn prev(&mut self) {
+    pub fn prev(self) -> Self {
         match self.vpn.0.checked_sub(Meta::pages_in(self.level)) {
-            Some(vpn) => self.vpn.0 = vpn,
+            Some(vpn) => Self {
+                vpn: VPN(vpn),
+                ..self
+            },
             None => panic!("prev: vpn overflow"),
         }
     }
 
     /// 向后移动一页。
     #[inline]
-    pub fn next(&mut self) {
+    pub fn next(self) -> Self {
         match self.vpn.0.checked_add(Meta::pages_in(self.level)) {
-            Some(vpn) => self.vpn.0 = vpn,
+            Some(vpn) => Self {
+                vpn: VPN(vpn),
+                ..self
+            },
             None => panic!("next: vpn overflow"),
         }
     }
 
     /// 向上移动一页。
     #[inline]
-    pub fn up(&mut self) {
+    pub fn up(self) -> Self {
         match self.level.checked_add(1) {
-            Some(level) => self.level = level,
+            Some(level) => Self { level, ..self },
             None => panic!("up: level overflow"),
         }
     }
 
     /// 向下移动一页。
     #[inline]
-    pub fn down(&mut self) {
+    pub fn down(self) -> Self {
         match self.level.checked_sub(1) {
-            Some(level) => self.level = level,
+            Some(level) => Self { level, ..self },
             None => panic!("down: level overflow"),
         }
-    }
-
-    /// 结束遍历。
-    #[inline]
-    pub fn stop(&mut self) {
-        self.level = usize::MAX;
     }
 }
 
 /// 使用访问器 `visitor` 遍历虚址空间 `root`。
 pub fn walk<Meta: MmuMeta>(mut visitor: impl Visitor<Meta>, root: &mut PageTable<Meta>) {
-    let mut target = Pos::ROOT;
+    let mut target = visitor.start();
     walk_inner(&mut visitor, root, &mut target, VPN(0), Meta::MAX_LEVEL);
 }
 
@@ -95,27 +120,44 @@ fn walk_inner<Meta: MmuMeta>(
     level: usize,
 ) {
     // 如果目标虚页不在当前页表覆盖范围内，回到上一级页表
-    while level <= target.level && (base..base + Meta::pages_in(level)).contains(&target.vpn) {
+    while level >= target.level && (base..base + Meta::pages_in(level)).contains(&target.vpn) {
         // 计算作为页表项的序号
         let index = target.vpn.index_in(level);
         // 借出页表项
         let pte = &mut table[index];
-        // 如果目标节点等级比当前低需要查页表
-        // 如果有效且不是叶子的页表项是子页表
-        if target.level < level && pte.is_valid() && !pte.is_leaf() {
-            let table = unsafe {
-                &mut *visitor
-                    .translate(pte.ppn())
-                    .base()
-                    .as_mut_ptr::<PageTable<Meta>>()
-            };
-            let level = level - 1;
-            let base = base + index * Meta::pages_in(level);
-            walk_inner(visitor, table, target, base, level);
+        // 目标节点等级比当前低需要查页表
+        if level > target.level {
+            // 有效且不是叶子的页表项是子页表
+            if pte.is_valid() && !pte.is_leaf() {
+                let table = unsafe {
+                    &mut *visitor
+                        .translate(pte.ppn())
+                        .base()
+                        .as_mut_ptr::<PageTable<Meta>>()
+                };
+                let level = level - 1;
+                let base = base + index * Meta::pages_in(level);
+                walk_inner(visitor, table, target, base, level);
+            }
+            // 否则请求用户操作
+            else {
+                match visitor.meet(level, *pte, *target) {
+                    // 重设目标
+                    Update::Target(new) => *target = new,
+                    // 修改页表
+                    Update::Pte(new, vpn) => {
+                        let table = unsafe { &mut *vpn.base().as_mut_ptr::<PageTable<Meta>>() };
+                        *pte = new;
+                        let level = level - 1;
+                        let base = base + index * Meta::pages_in(level);
+                        walk_inner(visitor, table, target, base, level);
+                    }
+                }
+            }
         }
-        // 访问目标节点、无效节点或叶子节点
+        // 访问目标节点
         else {
-            visitor.walk(level, target, pte);
+            *target = visitor.arrive(pte, *target);
         }
     }
 }
