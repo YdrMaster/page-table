@@ -17,16 +17,15 @@ impl Add<usize> for PPN {
     type Output = Self;
 
     #[inline]
-    fn add(mut self, rhs: usize) -> Self {
-        self += rhs;
-        self
+    fn add(self, rhs: usize) -> Self {
+        Self(self.0.wrapping_add(rhs))
     }
 }
 
 impl AddAssign<usize> for PPN {
     #[inline]
     fn add_assign(&mut self, rhs: usize) {
-        self.0 += rhs;
+        *self = *self + rhs;
     }
 }
 
@@ -59,16 +58,15 @@ impl Add<usize> for VPN {
     type Output = Self;
 
     #[inline]
-    fn add(mut self, rhs: usize) -> Self {
-        self += rhs;
-        self
+    fn add(self, rhs: usize) -> Self {
+        Self(self.0.wrapping_add(rhs))
     }
 }
 
 impl AddAssign<usize> for VPN {
     #[inline]
     fn add_assign(&mut self, rhs: usize) {
-        self.0 += rhs;
+        *self = *self + rhs;
     }
 }
 

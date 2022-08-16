@@ -5,51 +5,14 @@ use core::ops::{Index, IndexMut};
 #[repr(C, align(4096))]
 pub struct PageTable<Meta: MmuMeta>([Pte<Meta>; ENTRIES_PER_TABLE]);
 
-/// 查询结果。
-#[derive(Clone, Copy, Debug)]
-pub enum PtQuery<Meta: MmuMeta> {
-    /// 虚存对应的页表项不存在。
-    Invalid,
-    /// 下一级页表的物理页号。
-    SubTable(PPN),
-    /// 页表项。
-    Leaf(Pte<Meta>),
-}
-
-#[derive(Clone, Copy, Debug)]
-pub enum EntryError {
-    InvalidLevel,
-    LeafMisaligned,
-}
-
 impl<Meta: MmuMeta> PageTable<Meta> {
     /// 空白页表。
     pub const ZERO: Self = Self([Pte::ZERO; ENTRIES_PER_TABLE]);
-
-    /// 页表长度。
-    ///
-    /// 总长度，而非有效项的数量。这是一个常量。
-    #[inline]
-    pub const fn len(&self) -> usize {
-        self.0.len()
-    }
-
-    /// 如果页表中至少一个项有效，返回 `true`。
-    #[inline]
-    pub fn is_empty(&self) -> bool {
-        !self.0.iter().any(|pte| pte.is_valid())
-    }
 
     /// 获取指向第一个页表项的指针。
     #[inline]
     pub fn as_ptr(&self) -> *const Pte<Meta> {
         self.0.as_ptr()
-    }
-
-    // 获取页表项。
-    #[inline]
-    pub(crate) fn get_mut(&mut self, index: usize) -> Option<&mut Pte<Meta>> {
-        self.0.get_mut(index)
     }
 
     /// 将此页表视为一个 `level` 级页表，设置一个页表项。
@@ -106,6 +69,36 @@ impl<Meta: MmuMeta> IndexMut<usize> for PageTable<Meta> {
     }
 }
 
+/// 查询结果。
+#[derive(Clone, Copy, Debug)]
+pub enum PtQuery<Meta: MmuMeta> {
+    /// 虚存对应的页表项不存在。
+    Invalid,
+    /// 下一级页表的物理页号。
+    SubTable(PPN),
+    /// 页表项。
+    Leaf(Pte<Meta>),
+}
+
+impl<Meta: MmuMeta> From<Pte<Meta>> for PtQuery<Meta> {
+    #[inline]
+    fn from(pte: Pte<Meta>) -> Self {
+        if !pte.is_valid() {
+            Self::Invalid
+        } else if pte.is_leaf() {
+            Self::Leaf(pte)
+        } else {
+            Self::SubTable(pte.ppn())
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum EntryError {
+    InvalidLevel,
+    LeafMisaligned,
+}
+
 /// 擦除迭代器。
 pub struct Eraser<'a, Meta: MmuMeta>(&'a mut PageTable<Meta>, usize);
 
@@ -122,18 +115,5 @@ impl<'a, Meta: MmuMeta> Iterator for Eraser<'a, Meta> {
             }
         }
         None
-    }
-}
-
-impl<Meta: MmuMeta> From<Pte<Meta>> for PtQuery<Meta> {
-    #[inline]
-    fn from(pte: Pte<Meta>) -> Self {
-        if !pte.is_valid() {
-            PtQuery::Invalid
-        } else if pte.is_leaf() {
-            PtQuery::Leaf(pte)
-        } else {
-            PtQuery::SubTable(pte.ppn())
-        }
     }
 }
