@@ -1,8 +1,8 @@
 ﻿use crate::{VmFlags, VmMeta, PPN};
-use core::marker::PhantomData;
+use core::{fmt, marker::PhantomData};
 
 /// 页表项。
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct Pte<Meta: VmMeta>(pub usize, pub(crate) PhantomData<Meta>);
 
@@ -81,5 +81,13 @@ impl<Meta: VmMeta> Pte<Meta> {
     pub fn flags(mut self) -> VmFlags<Meta> {
         Meta::clear_ppn(&mut self.0);
         unsafe { VmFlags::from_raw(self.0) }
+    }
+}
+
+impl<Meta: VmMeta> fmt::Debug for Pte<Meta> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Pte(")?;
+        self.0.fmt(f)?;
+        write!(f, ")")
     }
 }

@@ -7,7 +7,6 @@ mod addr;
 mod flags;
 mod pte;
 mod table;
-// mod fmt;
 
 cfg_if::cfg_if! {
     if #[cfg(any(target_arch = "riscv64", target_arch = "riscv32"))] {
@@ -93,10 +92,16 @@ pub trait VmMeta: 'static + MmuMeta + Copy + Ord + core::hash::Hash + core::fmt:
         1 << Self::LEVEL_BITS[..=level].iter().sum::<usize>()
     }
 
-    /// `level` 级页表容纳的总页数。
+    /// `level` 级页表容纳的总字节数。
     #[inline]
     fn bytes_in_table(level: usize) -> usize {
         1 << (Self::LEVEL_BITS[..=level].iter().sum::<usize>() + Self::PAGE_BITS)
+    }
+
+    /// `level` 级页容纳的总字节数。
+    #[inline]
+    fn bytes_in_page(level: usize) -> usize {
+        1 << (Self::LEVEL_BITS[..level].iter().sum::<usize>() + Self::PAGE_BITS)
     }
 
     /// 判断页表项指向的是一个大于 0 级（4 kiB）的物理页。

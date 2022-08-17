@@ -2,11 +2,11 @@
 use core::{
     fmt,
     marker::PhantomData,
-    ops::{Add, AddAssign},
+    ops::{Add, AddAssign, Range},
 };
 
 /// 页号。
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
 pub struct PageNumber<Meta: VmMeta, S: Space>(usize, PhantomData<Meta>, PhantomData<S>);
 
@@ -71,6 +71,12 @@ impl<Meta: VmMeta> PPN<Meta> {
     pub const MAX: Self = Self::new(mask(Meta::P_ADDR_BITS - Meta::PAGE_BITS));
 }
 
+impl<Meta: VmMeta> fmt::Debug for PPN<Meta> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "PPN({:#x})", self.0)
+    }
+}
+
 impl<Meta: VmMeta> VPN<Meta> {
     /// 最大虚拟页号。
     pub const MAX: Self = Self::new(mask(Meta::V_ADDR_BITS - Meta::PAGE_BITS));
@@ -101,6 +107,13 @@ impl<Meta: VmMeta> VPN<Meta> {
         (self.0 + mask(bits)) >> bits
     }
 
+    /// 包含这个虚页的 `level` 级页表容纳的虚页范围。
+    #[inline]
+    pub fn vaddr_range(self, level: usize) -> Range<VAddr<Meta>> {
+        let base = self.base();
+        base..base + Meta::bytes_in_page(level)
+    }
+
     /// 虚页的对齐级别，使虚页在页表中序号为 0 的最高等级页表的级别。
     #[inline]
     pub fn align_level(self) -> usize {
@@ -121,10 +134,32 @@ impl<Meta: VmMeta> VPN<Meta> {
     }
 }
 
+impl<Meta: VmMeta> fmt::Debug for VPN<Meta> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "VPN({:#x})", self.0)
+    }
+}
+
 /// 虚拟地址。
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 #[repr(transparent)]
 pub struct VAddr<Meta: VmMeta>(usize, PhantomData<Meta>);
+
+impl<Meta: VmMeta> Add<usize> for VAddr<Meta> {
+    type Output = Self;
+
+    #[inline]
+    fn add(self, rhs: usize) -> Self {
+        Self::new(self.0.wrapping_add(rhs))
+    }
+}
+
+impl<Meta: VmMeta> AddAssign<usize> for VAddr<Meta> {
+    #[inline]
+    fn add_assign(&mut self, rhs: usize) {
+        self.0 = self.0.wrapping_add(rhs);
+    }
+}
 
 impl<Meta: VmMeta> VAddr<Meta> {
     /// 将一个地址值转换为虚拟地址意味着允许虚存方案根据实际情况裁剪地址值。
