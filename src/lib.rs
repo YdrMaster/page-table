@@ -1,7 +1,7 @@
 //! x
 
 #![no_std]
-// #![deny(warnings, unsafe_code, unstable_features, missing_docs)]
+#![deny(warnings, unstable_features, missing_docs)]
 
 mod addr;
 mod flags;
@@ -163,13 +163,13 @@ pub trait MmuMeta: 'static + Copy {
     /// 从 PTE 中获得 PPN。
     #[inline]
     fn ppn(value: usize) -> PPN {
-        PPN((value & Self::PPN_MASK) >> Self::PPN_BASE)
+        PPN::new((value & Self::PPN_MASK) >> Self::PPN_BASE)
     }
 
     /// 设置页表项的 ppn。
     #[inline]
     fn set_ppn(value: &mut usize, ppn: PPN) {
-        *value |= (ppn.0 << Self::PPN_BASE) & Self::PPN_MASK;
+        *value |= (ppn.val() << Self::PPN_BASE) & Self::PPN_MASK;
     }
 
     /// 清除页表项中的 ppn。

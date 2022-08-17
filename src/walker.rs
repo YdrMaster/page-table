@@ -8,6 +8,9 @@ pub trait Visitor<Meta: MmuMeta> {
     /// 从根页表出发时调用一次，设置第一个目标。
     fn start(&mut self) -> Pos<Meta>;
 
+    /// 在访问目标节点的过程中，经过一个位于 `ppn` 物理页中间页表，需要计算这个物理页的虚页号。
+    fn translate(&self, ppn: PPN) -> VPN;
+
     /// 到达 `target_hint` 节点。
     fn arrive(&mut self, pte: &mut Pte<Meta>, target_hint: Pos<Meta>) -> Pos<Meta>;
 
@@ -18,9 +21,6 @@ pub trait Visitor<Meta: MmuMeta> {
     /// - 访问到包含目标虚页的大页节点；
     /// - 访问到包含目标虚页的无效节点；
     fn meet(&mut self, level: usize, pte: Pte<Meta>, target_hint: Pos<Meta>) -> Update<Meta>;
-
-    /// 在访问目标节点的过程中，经过一个位于 `ppn` 物理页中间页表，需要计算这个物理页的虚页号。
-    fn translate(&self, ppn: PPN) -> VPN;
 }
 
 /// 遍历中断时的更新方案。
@@ -56,7 +56,7 @@ impl<Meta: MmuMeta> Pos<Meta> {
     #[inline]
     pub const fn stop() -> Self {
         Self {
-            vpn: VPN(0),
+            vpn: VPN::ZERO,
             level: Meta::MAX_LEVEL + 1,
             _phantom: PhantomData,
         }
@@ -65,9 +65,9 @@ impl<Meta: MmuMeta> Pos<Meta> {
     /// 向前移动一页。
     #[inline]
     pub fn prev(self) -> Self {
-        match self.vpn.0.checked_sub(Meta::pages_in(self.level)) {
+        match self.vpn.val().checked_sub(Meta::pages_in(self.level)) {
             Some(vpn) => Self {
-                vpn: VPN(vpn),
+                vpn: VPN::new(vpn),
                 ..self
             },
             None => panic!("prev: vpn overflow"),
@@ -77,9 +77,9 @@ impl<Meta: MmuMeta> Pos<Meta> {
     /// 向后移动一页。
     #[inline]
     pub fn next(self) -> Self {
-        match self.vpn.0.checked_add(Meta::pages_in(self.level)) {
+        match self.vpn.val().checked_add(Meta::pages_in(self.level)) {
             Some(vpn) => Self {
-                vpn: VPN(vpn),
+                vpn: VPN::new(vpn),
                 ..self
             },
             None => panic!("next: vpn overflow"),
@@ -108,7 +108,7 @@ impl<Meta: MmuMeta> Pos<Meta> {
 /// 使用访问器 `visitor` 遍历虚址空间 `root`。
 pub fn walk<Meta: MmuMeta>(mut visitor: impl Visitor<Meta>, root: &mut PageTable<Meta>) {
     let mut target = visitor.start();
-    walk_inner(&mut visitor, root, &mut target, VPN(0), Meta::MAX_LEVEL);
+    walk_inner(&mut visitor, root, &mut target, VPN::ZERO, Meta::MAX_LEVEL);
 }
 
 /// 递归遍历。

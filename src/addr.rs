@@ -1,38 +1,68 @@
 ﻿use crate::{mask, PAGE_BITS, PT_LEVEL_BITS, P_ADDR_BITS};
-use core::ops::{Add, AddAssign};
+use core::{
+    marker::PhantomData,
+    ops::{Add, AddAssign},
+};
 
-/// 物理页号。
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 #[repr(transparent)]
-pub struct PPN(pub usize);
+pub struct PageNumber<S: Space>(usize, PhantomData<S>);
 
-impl PPN {
-    /// 最小物理页号。
-    pub const MIN: Self = PPN(0);
-    /// 最大物理页号。
-    pub const MAX: Self = PPN(mask(P_ADDR_BITS - PAGE_BITS));
+pub trait Space {}
+
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+pub struct Physical;
+
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+pub struct Virtual;
+
+impl Space for Physical {}
+impl Space for Virtual {}
+
+impl<S: Space> PageNumber<S> {
+    /// 页号零。
+    pub const ZERO: Self = Self::new(0);
+
+    /// 最小页号。
+    pub const MIN: Self = Self::ZERO;
+
+    #[inline]
+    pub const fn new(n: usize) -> Self {
+        Self(n, PhantomData)
+    }
+
+    #[inline]
+    pub const fn val(self) -> usize {
+        self.0
+    }
 }
 
-impl Add<usize> for PPN {
+impl<S: Space> Add<usize> for PageNumber<S> {
     type Output = Self;
 
     #[inline]
     fn add(self, rhs: usize) -> Self {
-        Self(self.0.wrapping_add(rhs))
+        Self(self.0.wrapping_add(rhs), PhantomData)
     }
 }
 
-impl AddAssign<usize> for PPN {
+impl<S: Space> AddAssign<usize> for PageNumber<S> {
     #[inline]
     fn add_assign(&mut self, rhs: usize) {
-        *self = *self + rhs;
+        self.0 = self.0.wrapping_add(rhs);
     }
 }
 
+/// 物理页号。
+pub type PPN = PageNumber<Physical>;
+
 /// 虚拟页号。
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
-#[repr(transparent)]
-pub struct VPN(pub usize);
+pub type VPN = PageNumber<Virtual>;
+
+impl PPN {
+    /// 最大物理页号。
+    pub const MAX: Self = Self(mask(P_ADDR_BITS - PAGE_BITS), PhantomData);
+}
 
 impl VPN {
     /// 虚页的起始地址。
@@ -54,22 +84,6 @@ impl VPN {
     }
 }
 
-impl Add<usize> for VPN {
-    type Output = Self;
-
-    #[inline]
-    fn add(self, rhs: usize) -> Self {
-        Self(self.0.wrapping_add(rhs))
-    }
-}
-
-impl AddAssign<usize> for VPN {
-    #[inline]
-    fn add_assign(&mut self, rhs: usize) {
-        *self = *self + rhs;
-    }
-}
-
 /// 虚拟地址。
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 #[repr(transparent)]
@@ -88,7 +102,6 @@ impl VAddr {
     /// # Safety
     ///
     /// 调用者需要确保虚地址在当前地址空间中。
-    #[allow(unsafe_code)]
     #[inline]
     pub const unsafe fn as_ptr<T>(self) -> *const T {
         self.0 as _
@@ -99,7 +112,6 @@ impl VAddr {
     /// # Safety
     ///
     /// 调用者需要确保虚地址在当前地址空间中。
-    #[allow(unsafe_code)]
     #[inline]
     pub unsafe fn as_mut_ptr<T>(self) -> *mut T {
         self.0 as _
@@ -108,13 +120,13 @@ impl VAddr {
     /// 包括这个虚地址最后页的页号。
     #[inline]
     pub const fn floor(self) -> VPN {
-        VPN(self.0 >> PAGE_BITS)
+        VPN::new(self.0 >> PAGE_BITS)
     }
 
     /// 不包括这个虚地址的最前页的页号。
     #[inline]
     pub const fn ceil(self) -> VPN {
-        VPN((self.0 + mask(PAGE_BITS)) >> PAGE_BITS)
+        VPN::new((self.0 + mask(PAGE_BITS)) >> PAGE_BITS)
     }
 }
 

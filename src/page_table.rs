@@ -33,7 +33,7 @@ impl<Meta: MmuMeta> PageTable<Meta> {
             Err(EntryError::InvalidLevel)?;
         }
         let page_align = level * PT_LEVEL_BITS;
-        if entry.is_huge(level) && (entry.ppn().0.trailing_zeros() as usize) < page_align {
+        if entry.is_huge(level) && (entry.ppn().val().trailing_zeros() as usize) < page_align {
             Err(EntryError::LeafMisaligned)?;
         }
         self.0[vaddr.floor().index_in(level)] = entry;
