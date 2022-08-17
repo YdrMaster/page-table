@@ -5,9 +5,9 @@
 
 mod addr;
 mod flags;
-mod page_table;
 mod pte;
-pub mod walker;
+mod table;
+pub mod visit;
 
 cfg_if::cfg_if! {
     if #[cfg(any(target_arch = "riscv64", target_arch = "riscv32"))] {
@@ -27,8 +27,8 @@ cfg_if::cfg_if! {
 pub use addr::{VAddr, PPN, VPN};
 pub use arch::*;
 pub use flags::VmFlags;
-pub use page_table::PageTable;
 pub use pte::Pte;
+pub use table::PageTable;
 
 /// 地址转换单元元数据。
 pub trait MmuMeta {
@@ -82,7 +82,7 @@ pub trait VmMeta: 'static + MmuMeta + Copy + Ord + core::hash::Hash + core::fmt:
     const PAGE_BITS: usize = Self::LEVEL_BITS[0];
 
     /// 页表最大级别。
-    const MAX_LEVEL: usize = Self::LEVEL_BITS.len() - 1;
+    const MAX_LEVEL: usize = Self::LEVEL_BITS.len().saturating_sub(2);
 
     /// 页表项中的物理页号掩码。
     const PPN_MASK: usize = ppn_mask::<Self>();
@@ -193,5 +193,31 @@ const fn const_sum(val: usize, bits: &[usize]) -> usize {
     match bits {
         [] => val,
         [n, tail @ ..] => const_sum(val + *n, tail),
+    }
+}
+
+#[cfg(test)]
+mod test_meta {
+    #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+    pub(crate) struct Sv39;
+
+    impl super::MmuMeta for Sv39 {
+        const P_ADDR_BITS: usize = 56;
+        const LEVEL_BITS: &'static [usize] = &[12, 9, 9, 9];
+        const FLAG_POS_V: usize = 0;
+        const FLAG_POS_R: usize = 1;
+        const FLAG_POS_W: usize = 2;
+        const FLAG_POS_X: usize = 3;
+        const FLAG_POS_U: usize = 4;
+        const FLAG_POS_G: usize = 5;
+        const FLAG_POS_A: usize = 6;
+        const FLAG_POS_D: usize = 7;
+        const PPN_POS: usize = 10;
+
+        #[inline]
+        fn is_leaf(value: usize) -> bool {
+            const MASK: usize = 0b1110;
+            value & MASK != 0
+        }
     }
 }

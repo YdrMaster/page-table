@@ -81,6 +81,23 @@ impl<Meta: VmMeta> VPN<Meta> {
         let base: usize = Meta::LEVEL_BITS[1..][..level].iter().sum();
         (self.0 >> base) & mask(Meta::LEVEL_BITS[level + 1])
     }
+
+    /// 虚页的对齐级别，使虚页在页表中序号为 0 的最高等级页表的级别。
+    #[inline]
+    pub fn align_level(self) -> usize {
+        let mut n = self.0;
+        for (i, bits) in Meta::LEVEL_BITS[1..=Meta::MAX_LEVEL]
+            .iter()
+            .rev()
+            .enumerate()
+        {
+            if n & mask(*bits) != 0 {
+                return i;
+            }
+            n >>= bits;
+        }
+        Meta::MAX_LEVEL
+    }
 }
 
 /// 虚拟地址。
@@ -141,4 +158,14 @@ impl<Meta: VmMeta, T> From<&T> for VAddr<Meta> {
     fn from(value: &T) -> Self {
         Self::new(value as *const _ as _)
     }
+}
+
+#[test]
+fn test_align_level() {
+    use crate::test_meta::Sv39;
+
+    assert_eq!(VPN::<Sv39>::new(1).align_level(), 0);
+    assert_eq!(VPN::<Sv39>::new(1 << 9).align_level(), 1);
+    assert_eq!(VPN::<Sv39>::new(1 << 18).align_level(), 2);
+    assert_eq!(VPN::<Sv39>::new(0).align_level(), 2);
 }

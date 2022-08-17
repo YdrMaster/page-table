@@ -57,7 +57,7 @@ mod assertions {
     use static_assertions::const_assert_eq;
 
     const_assert_eq!(Sv32::V_ADDR_BITS, 32);
-    const_assert_eq!(Sv32::MAX_LEVEL, 2);
+    const_assert_eq!(Sv32::MAX_LEVEL, 1);
     const_assert_eq!(Sv32::PAGE_BITS, 12);
 }
 
@@ -71,9 +71,9 @@ mod assertions {
     const_assert_eq!(Sv48::V_ADDR_BITS, 48);
     const_assert_eq!(Sv57::V_ADDR_BITS, 57);
 
-    const_assert_eq!(Sv39::MAX_LEVEL, 3);
-    const_assert_eq!(Sv48::MAX_LEVEL, 4);
-    const_assert_eq!(Sv57::MAX_LEVEL, 5);
+    const_assert_eq!(Sv39::MAX_LEVEL, 2);
+    const_assert_eq!(Sv48::MAX_LEVEL, 3);
+    const_assert_eq!(Sv57::MAX_LEVEL, 4);
 
     const_assert_eq!(Sv39::PAGE_BITS, 12);
     const_assert_eq!(Sv48::PAGE_BITS, 12);
