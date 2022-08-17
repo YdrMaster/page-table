@@ -7,6 +7,7 @@ mod addr;
 mod flags;
 mod pte;
 mod table;
+// mod fmt;
 pub mod visit;
 
 cfg_if::cfg_if! {
@@ -34,6 +35,9 @@ pub use table::PageTable;
 pub trait MmuMeta {
     /// 物理地址位数，用于计算物理页号形式。
     const P_ADDR_BITS: usize;
+
+    /// 页内偏移的位数。
+    const PAGE_BITS: usize;
 
     /// 各级页内虚地址位数位数。
     const LEVEL_BITS: &'static [usize];
@@ -76,21 +80,24 @@ pub trait MmuMeta {
 /// 页式虚存元数据。
 pub trait VmMeta: 'static + MmuMeta + Copy + Ord + core::hash::Hash + core::fmt::Debug {
     /// 虚拟页号位数，用于裁剪或扩展正确的虚址。
-    const V_ADDR_BITS: usize = const_sum(0, Self::LEVEL_BITS);
-
-    /// 页内偏移的位数
-    const PAGE_BITS: usize = Self::LEVEL_BITS[0];
+    const V_ADDR_BITS: usize = Self::PAGE_BITS + const_sum(0, Self::LEVEL_BITS);
 
     /// 页表最大级别。
-    const MAX_LEVEL: usize = Self::LEVEL_BITS.len().saturating_sub(2);
+    const MAX_LEVEL: usize = Self::LEVEL_BITS.len() - 1;
 
     /// 页表项中的物理页号掩码。
     const PPN_MASK: usize = ppn_mask::<Self>();
 
-    /// `level` 级页表容纳的页数。
+    /// `level` 级页表容纳的总页数。
     #[inline]
-    fn pages_in(level: usize) -> usize {
-        1 << Self::LEVEL_BITS[level]
+    fn pages_in_table(level: usize) -> usize {
+        1 << Self::LEVEL_BITS[..=level].iter().sum::<usize>()
+    }
+
+    /// `level` 级页表容纳的总页数。
+    #[inline]
+    fn bytes_in_table(level: usize) -> usize {
+        1 << (Self::LEVEL_BITS[..=level].iter().sum::<usize>() + Self::PAGE_BITS)
     }
 
     /// 判断页表项指向的是一个大于 0 级（4 kiB）的物理页。
@@ -183,7 +190,7 @@ const fn mask(bits: usize) -> usize {
 #[inline]
 const fn ppn_mask<Meta: MmuMeta>() -> usize {
     let m0: usize = !mask(Meta::PPN_POS);
-    let m1: usize = mask(Meta::PPN_POS + Meta::P_ADDR_BITS - Meta::LEVEL_BITS[0]);
+    let m1: usize = mask(Meta::PPN_POS + Meta::P_ADDR_BITS - Meta::PAGE_BITS);
     m0 & m1
 }
 
@@ -203,7 +210,8 @@ mod test_meta {
 
     impl super::MmuMeta for Sv39 {
         const P_ADDR_BITS: usize = 56;
-        const LEVEL_BITS: &'static [usize] = &[12, 9, 9, 9];
+        const PAGE_BITS: usize = 12;
+        const LEVEL_BITS: &'static [usize] = &[9; 3];
         const FLAG_POS_V: usize = 0;
         const FLAG_POS_R: usize = 1;
         const FLAG_POS_W: usize = 2;
@@ -219,5 +227,18 @@ mod test_meta {
             const MASK: usize = 0b1110;
             value & MASK != 0
         }
+    }
+
+    #[test]
+    fn test_pages() {
+        use super::VmMeta;
+
+        assert_eq!(Sv39::pages_in_table(0), 512);
+        assert_eq!(Sv39::pages_in_table(1), 512 * 512);
+        assert_eq!(Sv39::pages_in_table(2), 512 * 512 * 512);
+
+        assert_eq!(Sv39::bytes_in_table(0), 4096 * 512);
+        assert_eq!(Sv39::bytes_in_table(1), 4096 * 512 * 512);
+        assert_eq!(Sv39::bytes_in_table(2), 4096 * 512 * 512 * 512);
     }
 }

@@ -14,8 +14,10 @@ impl<Meta: VmMeta> PageTable<Meta> {
     /// 同 [from_raw_parts_mut](core::slice::from_raw_parts_mut).
     #[inline]
     pub unsafe fn from_raw_parts(ptr: *mut Pte<Meta>, level: usize) -> Self {
-        let len = 1 << Meta::LEVEL_BITS[level + 1];
-        Self(core::slice::from_raw_parts_mut(ptr, len))
+        Self(core::slice::from_raw_parts_mut(
+            ptr,
+            1 << Meta::LEVEL_BITS[level],
+        ))
     }
 
     /// 获取指向第一个页表项的指针。

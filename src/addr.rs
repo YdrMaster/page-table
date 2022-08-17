@@ -78,19 +78,15 @@ impl<Meta: VmMeta> VPN<Meta> {
     /// 虚页在 `level` 级页表中的位置。
     #[inline]
     pub fn index_in(self, level: usize) -> usize {
-        let base: usize = Meta::LEVEL_BITS[1..][..level].iter().sum();
-        (self.0 >> base) & mask(Meta::LEVEL_BITS[level + 1])
+        let base: usize = Meta::LEVEL_BITS[..level].iter().sum();
+        (self.0 >> base) & mask(Meta::LEVEL_BITS[level])
     }
 
     /// 虚页的对齐级别，使虚页在页表中序号为 0 的最高等级页表的级别。
     #[inline]
     pub fn align_level(self) -> usize {
         let mut n = self.0;
-        for (i, bits) in Meta::LEVEL_BITS[1..=Meta::MAX_LEVEL]
-            .iter()
-            .rev()
-            .enumerate()
-        {
+        for (i, bits) in Meta::LEVEL_BITS[..Meta::MAX_LEVEL].iter().rev().enumerate() {
             if n & mask(*bits) != 0 {
                 return i;
             }

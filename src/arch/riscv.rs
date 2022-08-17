@@ -22,7 +22,8 @@ pub struct Sv<const N: usize>;
 
 impl<const N: usize> crate::MmuMeta for Sv<N> {
     const P_ADDR_BITS: usize = P_ADDR_BITS;
-    const LEVEL_BITS: &'static [usize] = level_bits::<N>();
+    const PAGE_BITS: usize = 12;
+    const LEVEL_BITS: &'static [usize] = &[pt_level_bits(Self::PAGE_BITS); N];
     const FLAG_POS_V: usize = 0;
     const FLAG_POS_R: usize = 1;
     const FLAG_POS_W: usize = 2;
@@ -40,20 +41,15 @@ impl<const N: usize> crate::MmuMeta for Sv<N> {
     }
 }
 
-const fn level_bits<const N: usize>() -> &'static [usize] {
-    match N {
-        2 => &[12, 10, 10],
-        3 => &[12, 9, 9, 9],
-        4 => &[12, 9, 9, 9, 9],
-        5 => &[12, 9, 9, 9, 9, 9],
-        _ => unreachable!(),
-    }
+#[inline]
+const fn pt_level_bits(page_bits: usize) -> usize {
+    page_bits - core::mem::size_of::<usize>().trailing_zeros() as usize
 }
 
 #[cfg(target_pointer_width = "32")]
 mod assertions {
     use super::*;
-    use crate::VmMeta;
+    use crate::{MmuMeta, VmMeta};
     use static_assertions::const_assert_eq;
 
     const_assert_eq!(Sv32::V_ADDR_BITS, 32);
@@ -64,7 +60,7 @@ mod assertions {
 #[cfg(target_pointer_width = "64")]
 mod assertions {
     use super::*;
-    use crate::VmMeta;
+    use crate::{MmuMeta, VmMeta};
     use static_assertions::const_assert_eq;
 
     const_assert_eq!(Sv39::V_ADDR_BITS, 39);
