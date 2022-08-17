@@ -25,7 +25,7 @@ cfg_if::cfg_if! {
     }
 }
 
-pub use addr::{VAddr, PPN, VPN};
+pub use addr::*;
 pub use arch::*;
 pub use flags::VmFlags;
 pub use pte::Pte;

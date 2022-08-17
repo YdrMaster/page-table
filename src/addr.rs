@@ -5,15 +5,19 @@ use core::{
     ops::{Add, AddAssign},
 };
 
+/// 页号。
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 #[repr(transparent)]
 pub struct PageNumber<Meta: VmMeta, S: Space>(usize, PhantomData<Meta>, PhantomData<S>);
 
+/// 地址空间标记。
 pub trait Space: Clone + Copy + PartialEq + Eq + PartialOrd + Ord + fmt::Debug {}
 
+/// 物理地址空间。
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct Physical;
 
+/// 虚地址空间。
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct Virtual;
 
@@ -27,11 +31,13 @@ impl<Meta: VmMeta, S: Space> PageNumber<Meta, S> {
     /// 最小页号。
     pub const MIN: Self = Self::ZERO;
 
+    /// 新建一个页号。
     #[inline]
     pub const fn new(n: usize) -> Self {
         Self(n, PhantomData, PhantomData)
     }
 
+    /// 获取页号值。
     #[inline]
     pub const fn val(self) -> usize {
         self.0
@@ -78,8 +84,11 @@ impl<Meta: VmMeta> VPN<Meta> {
     /// 虚页在 `level` 级页表中的位置。
     #[inline]
     pub fn index_in(self, level: usize) -> usize {
-        let base: usize = Meta::LEVEL_BITS[..level].iter().sum();
-        (self.0 >> base) & mask(Meta::LEVEL_BITS[level])
+        Meta::LEVEL_BITS
+            .iter()
+            .take(level)
+            .fold(self.0, |bits, it| bits >> it)
+            & mask(Meta::LEVEL_BITS[level])
     }
 
     /// 虚页的对齐级别，使虚页在页表中序号为 0 的最高等级页表的级别。
@@ -153,6 +162,18 @@ impl<Meta: VmMeta, T> From<&T> for VAddr<Meta> {
     #[inline]
     fn from(value: &T) -> Self {
         Self::new(value as *const _ as _)
+    }
+}
+
+#[test]
+fn test_index_in() {
+    use crate::test_meta::Sv39;
+
+    for i in 0..=Sv39::MAX_LEVEL {
+        let vpn = VPN::<Sv39>::new(1 << (i * 9));
+        for j in 0..=Sv39::MAX_LEVEL {
+            assert_eq!(vpn.index_in(j), if i == j { 1 } else { 0 });
+        }
     }
 }
 

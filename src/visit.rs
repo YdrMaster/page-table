@@ -5,8 +5,8 @@ use core::marker::PhantomData;
 
 /// `Meta` 方案的页表访问机制。
 pub trait Visitor<Meta: VmMeta> {
-    /// 从根页表出发时调用一次，设置第一个目标。
-    fn start(&mut self) -> Pos<Meta>;
+    /// 从预设的 `level` 级页表出发时调用一次，设置第一个目标。
+    fn start(&mut self, level: usize) -> Pos<Meta>;
 
     /// 在访问目标节点的过程中，经过一个位于 `ppn` 物理页中间页表，需要计算这个物理页的虚页号。
     fn translate(&self, ppn: PPN<Meta>) -> VPN<Meta>;
@@ -57,7 +57,7 @@ impl<Meta: VmMeta> Pos<Meta> {
     pub const fn stop() -> Self {
         Self {
             vpn: VPN::ZERO,
-            level: Meta::MAX_LEVEL + 1,
+            level: usize::MAX,
             _phantom: PhantomData,
         }
     }
@@ -106,9 +106,9 @@ impl<Meta: VmMeta> Pos<Meta> {
 }
 
 /// 使用访问器 `visitor` 遍历虚址空间 `root`。
-pub fn walk<Meta: VmMeta>(mut visitor: impl Visitor<Meta>, root: PageTable<Meta>) {
-    let mut target = visitor.start();
-    walk_inner(&mut visitor, &mut target, root, VPN::ZERO, Meta::MAX_LEVEL);
+pub fn walk<Meta: VmMeta>(mut visitor: impl Visitor<Meta>, table: PageTable<Meta>) {
+    let mut target = visitor.start(table.level());
+    walk_inner(&mut visitor, &mut target, table, VPN::ZERO);
 }
 
 /// 递归遍历。
@@ -117,12 +117,10 @@ fn walk_inner<Meta: VmMeta>(
     target: &mut Pos<Meta>,
     mut table: PageTable<Meta>,
     base: VPN<Meta>,
-    level: usize,
 ) {
+    let level = table.level();
     // 如果目标虚页不在当前页表覆盖范围内，回到上一级页表
-    while level >= target.level
-        && (base.val()..base.val() + Meta::pages_in_table(level)).contains(&target.vpn.val())
-    {
+    while level >= target.level && (base..base + table.pages()).contains(&target.vpn) {
         // 计算作为页表项的序号
         let index = target.vpn.index_in(level);
         // 借出页表项
@@ -134,12 +132,11 @@ fn walk_inner<Meta: VmMeta>(
                 let table = unsafe {
                     PageTable::from_raw_parts(
                         visitor.translate(pte.ppn()).base().as_mut_ptr(),
-                        level,
+                        level - 1,
                     )
                 };
-                let level = level - 1;
-                let base = base + index * Meta::pages_in_table(level);
-                walk_inner(visitor, target, table, base, level);
+                let base = base + index * table.pages();
+                walk_inner(visitor, target, table, base);
             }
             // 否则请求用户操作
             else {
@@ -148,12 +145,12 @@ fn walk_inner<Meta: VmMeta>(
                     Update::Target(new) => *target = new,
                     // 修改页表
                     Update::Pte(new, vpn) => {
-                        let table =
-                            unsafe { PageTable::from_raw_parts(vpn.base().as_mut_ptr(), level) };
+                        let table = unsafe {
+                            PageTable::from_raw_parts(vpn.base().as_mut_ptr(), level - 1)
+                        };
                         *pte = new;
-                        let level = level - 1;
-                        let base = base + index * Meta::pages_in_table(level);
-                        walk_inner(visitor, target, table, base, level);
+                        let base = base + index * table.pages();
+                        walk_inner(visitor, target, table, base);
                     }
                 }
             }
