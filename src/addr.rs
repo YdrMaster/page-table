@@ -84,11 +84,21 @@ impl<Meta: VmMeta> VPN<Meta> {
     /// 虚页在 `level` 级页表中的位置。
     #[inline]
     pub fn index_in(self, level: usize) -> usize {
-        Meta::LEVEL_BITS
-            .iter()
-            .take(level)
-            .fold(self.0, |bits, it| bits >> it)
-            & mask(Meta::LEVEL_BITS[level])
+        (self.0 >> Self::bits_until(level)) & mask(Meta::LEVEL_BITS[level])
+    }
+
+    /// 包含这个虚页的 `level` 级页表起始地址。
+    #[inline]
+    pub fn floor(self, level: usize) -> Self {
+        let bits = Self::bits_until(level);
+        Self::new(self.0 & !mask(bits))
+    }
+
+    /// 不包含这个虚页的 `level` 级页表起始地址。
+    #[inline]
+    pub fn ceil(self, level: usize) -> usize {
+        let bits = Self::bits_until(level);
+        (self.0 + mask(bits)) >> bits
     }
 
     /// 虚页的对齐级别，使虚页在页表中序号为 0 的最高等级页表的级别。
@@ -102,6 +112,12 @@ impl<Meta: VmMeta> VPN<Meta> {
             n >>= bits;
         }
         Meta::MAX_LEVEL
+    }
+
+    /// `level` 级页表中页号的总位数。
+    #[inline]
+    fn bits_until(level: usize) -> usize {
+        Meta::LEVEL_BITS[..level].iter().sum::<usize>()
     }
 }
 

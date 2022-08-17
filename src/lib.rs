@@ -8,7 +8,6 @@ mod flags;
 mod pte;
 mod table;
 // mod fmt;
-pub mod visit;
 
 cfg_if::cfg_if! {
     if #[cfg(any(target_arch = "riscv64", target_arch = "riscv32"))] {
@@ -29,7 +28,7 @@ pub use addr::*;
 pub use arch::*;
 pub use flags::VmFlags;
 pub use pte::Pte;
-pub use table::PageTable;
+pub use table::*;
 
 /// 地址转换单元元数据。
 pub trait MmuMeta {

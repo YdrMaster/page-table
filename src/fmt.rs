@@ -1,24 +1,23 @@
-﻿use core::marker::PhantomData;
-
-use crate::{
-    walker::{Pos, Update, Visitor},
-    MmuMeta, PPN, VPN,
+﻿use crate::{
+    visit::{Pos, Update, Visitor},
+    VmMeta, PPN, VPN,
 };
+use core::marker::PhantomData;
 
-struct FmtVisitor<Meta: MmuMeta, F: Fn(PPN) -> VPN> {
+struct FmtVisitor<Meta: VmMeta, F: Fn(PPN<Meta>) -> VPN<Meta>> {
     f: F,
     _phantom: PhantomData<Meta>,
 }
 
-impl<Meta: MmuMeta, F: Fn(PPN) -> VPN> Visitor<Meta> for FmtVisitor<Meta, F> {
+impl<Meta: VmMeta, F: Fn(PPN<Meta>) -> VPN<Meta>> Visitor<Meta> for FmtVisitor<Meta, F> {
     #[inline]
-    fn start(&mut self) -> Pos<Meta> {
+    fn start(&mut self, level: usize) -> Pos<Meta> {
         // 总是从头开始
-        Pos::new(VPN::ZERO, 0)
+        Pos::new(VPN::ZERO, level)
     }
 
     #[inline]
-    fn translate(&self, ppn: crate::PPN) -> crate::VPN {
+    fn translate(&self, ppn: PPN<Meta>) -> VPN<Meta> {
         (self.f)(ppn)
     }
 
