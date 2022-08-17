@@ -1,15 +1,15 @@
 ﻿//! 遍历页表。
 
-use crate::{MmuMeta, PageTable, Pte, PPN, VPN};
+use crate::{PageTable, Pte, VmMeta, PPN, VPN};
 use core::marker::PhantomData;
 
 /// `Meta` 方案的页表访问机制。
-pub trait Visitor<Meta: MmuMeta> {
+pub trait Visitor<Meta: VmMeta> {
     /// 从根页表出发时调用一次，设置第一个目标。
     fn start(&mut self) -> Pos<Meta>;
 
     /// 在访问目标节点的过程中，经过一个位于 `ppn` 物理页中间页表，需要计算这个物理页的虚页号。
-    fn translate(&self, ppn: PPN) -> VPN;
+    fn translate(&self, ppn: PPN<Meta>) -> VPN<Meta>;
 
     /// 到达 `target_hint` 节点。
     fn arrive(&mut self, pte: &mut Pte<Meta>, target_hint: Pos<Meta>) -> Pos<Meta>;
@@ -24,27 +24,27 @@ pub trait Visitor<Meta: MmuMeta> {
 }
 
 /// 遍历中断时的更新方案。
-pub enum Update<Meta: MmuMeta> {
+pub enum Update<Meta: VmMeta> {
     /// 修改目标。
     Target(Pos<Meta>),
     /// 新建中间页表。
-    Pte(Pte<Meta>, VPN),
+    Pte(Pte<Meta>, VPN<Meta>),
 }
 
 /// `Meta` 方案中页表上的一个位置。
 #[derive(Clone, Copy)]
-pub struct Pos<Meta: MmuMeta> {
+pub struct Pos<Meta: VmMeta> {
     /// 目标页表项包含的一个虚页号。
-    pub vpn: VPN,
+    pub vpn: VPN<Meta>,
     /// 目标页表项的级别。
     pub level: usize,
     _phantom: PhantomData<Meta>,
 }
 
-impl<Meta: MmuMeta> Pos<Meta> {
+impl<Meta: VmMeta> Pos<Meta> {
     /// 新建目标。
     #[inline]
-    pub const fn new(vpn: VPN, level: usize) -> Self {
+    pub const fn new(vpn: VPN<Meta>, level: usize) -> Self {
         Self {
             vpn,
             level,
@@ -106,21 +106,23 @@ impl<Meta: MmuMeta> Pos<Meta> {
 }
 
 /// 使用访问器 `visitor` 遍历虚址空间 `root`。
-pub fn walk<Meta: MmuMeta>(mut visitor: impl Visitor<Meta>, root: &mut PageTable<Meta>) {
+pub fn walk<Meta: VmMeta>(mut visitor: impl Visitor<Meta>, root: &mut PageTable<Meta>) {
     let mut target = visitor.start();
     walk_inner(&mut visitor, root, &mut target, VPN::ZERO, Meta::MAX_LEVEL);
 }
 
 /// 递归遍历。
-fn walk_inner<Meta: MmuMeta>(
+fn walk_inner<Meta: VmMeta>(
     visitor: &mut impl Visitor<Meta>,
     table: &mut PageTable<Meta>,
     target: &mut Pos<Meta>,
-    base: VPN,
+    base: VPN<Meta>,
     level: usize,
 ) {
     // 如果目标虚页不在当前页表覆盖范围内，回到上一级页表
-    while level >= target.level && (base..base + Meta::pages_in(level)).contains(&target.vpn) {
+    while level >= target.level
+        && (base.val()..base.val() + Meta::pages_in(level)).contains(&target.vpn.val())
+    {
         // 计算作为页表项的序号
         let index = target.vpn.index_in(level);
         // 借出页表项

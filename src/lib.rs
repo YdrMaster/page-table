@@ -26,44 +26,17 @@ cfg_if::cfg_if! {
 
 pub use addr::{VAddr, PPN, VPN};
 pub use arch::*;
-pub use flags::MmuFlags;
+pub use flags::VmFlags;
 pub use page_table::{PageTable, PtQuery};
 pub use pte::Pte;
 
-/// 最小的分页大小。
-///
-/// 似乎任何架构都是或支持 4kiB 分页，而且对齐参数必须是字面量，所以此处直接做成常量。
-pub const PAGE_SIZE: usize = 4096;
-
-/// 页内偏移的位数
-pub const PAGE_BITS: usize = PAGE_SIZE.trailing_zeros() as _;
-
-/// 每级页表容纳的页数
-const ENTRIES_PER_TABLE: usize = PAGE_SIZE / core::mem::size_of::<usize>();
-
-/// 每级页表的序号位数
-pub const PT_LEVEL_BITS: usize = ENTRIES_PER_TABLE.trailing_zeros() as _;
-
-/// 分页元数据。
-pub trait MmuMeta: 'static + Copy {
+/// 地址转换单元元数据。
+pub trait MmuMeta {
     /// 物理地址位数，用于计算物理页号形式。
     const P_ADDR_BITS: usize;
 
-    /// 虚拟页号位数，用于裁剪或扩展正确的虚址。
-    const V_ADDR_BITS: usize;
-
-    /// 物理地址在 PTE 中的位置。
-    const PPN_BASE: usize;
-
-    /// 从 PTE 中遮罩出 PPN，用于修改 PPN。
-    ///
-    /// ## NOTE
-    ///
-    /// 永远不必设置这个常量，因为它是自动计算的。
-    const PPN_MASK: usize = ppn_mask(Self::PPN_BASE, Self::P_ADDR_BITS - PAGE_BITS);
-
-    /// 通过虚址位数计算页表最大级别。
-    const MAX_LEVEL: usize = calculate_max_level(Self::V_ADDR_BITS);
+    /// 各级页内虚地址位数位数。
+    const LEVEL_BITS: &'static [usize];
 
     /// 页表项有效。
     const FLAG_POS_V: usize;
@@ -89,22 +62,37 @@ pub trait MmuMeta: 'static + Copy {
     /// 页已写。
     const FLAG_POS_D: usize;
 
-    /// `level` 级页表容纳的页数。
-    #[inline]
-    fn pages_in(level: usize) -> usize {
-        1 << ((level + 1) * PT_LEVEL_BITS)
-    }
+    /// 物理页号在 PTE 中的位置。
+    const PPN_POS: usize;
 
     /// 如果页表项指向物理页，则返回 `true`。
     ///
-    /// ## NOTE
+    /// # NOTE
     ///
-    /// 为了零开销抽象，这个方法的实现可能不会判断 PTE 是否 valid。
+    /// 为了分散开销，这个方法的实现不会判断 PTE 是否 valid。
     fn is_leaf(value: usize) -> bool;
+}
+
+/// 页式虚存元数据。
+pub trait VmMeta: 'static + MmuMeta + Copy + Ord + core::hash::Hash + core::fmt::Debug {
+    /// 虚拟页号位数，用于裁剪或扩展正确的虚址。
+    const V_ADDR_BITS: usize = const_sum(0, Self::LEVEL_BITS);
+
+    /// 页内偏移的位数
+    const PAGE_BITS: usize = Self::LEVEL_BITS[0];
+
+    /// 页表最大级别。
+    const MAX_LEVEL: usize = Self::LEVEL_BITS.len() - 1;
+
+    /// `level` 级页表容纳的页数。
+    #[inline]
+    fn pages_in(level: usize) -> usize {
+        1 << Self::LEVEL_BITS[level]
+    }
 
     /// 判断页表项指向的是一个大于 0 级（4 kiB）的物理页。
     ///
-    /// ## NOTE
+    /// # NOTE
     ///
     /// 为了零开销抽象，这个方法的实现可能不会判断 PTE 是否 valid。
     #[inline]
@@ -162,27 +150,25 @@ pub trait MmuMeta: 'static + Copy {
 
     /// 从 PTE 中获得 PPN。
     #[inline]
-    fn ppn(value: usize) -> PPN {
-        PPN::new((value & Self::PPN_MASK) >> Self::PPN_BASE)
+    fn ppn(value: usize) -> PPN<Self> {
+        PPN::new((value & ppn_mask::<Self>()) >> Self::PPN_POS)
     }
 
     /// 设置页表项的 ppn。
     #[inline]
-    fn set_ppn(value: &mut usize, ppn: PPN) {
-        *value |= (ppn.val() << Self::PPN_BASE) & Self::PPN_MASK;
+    fn set_ppn(value: &mut usize, ppn: PPN<Self>) {
+        *value |= (ppn.val() << Self::PPN_POS) & ppn_mask::<Self>();
     }
 
     /// 清除页表项中的 ppn。
     #[inline]
     fn clear_ppn(value: &mut usize) {
-        *value &= !Self::PPN_MASK;
+        *value &= !ppn_mask::<Self>();
     }
 }
 
-#[inline]
-const fn calculate_max_level(v_addr_bits: usize) -> usize {
-    (v_addr_bits - PAGE_BITS + PT_LEVEL_BITS - 1) / PT_LEVEL_BITS - 1
-}
+/// 自动实现。
+impl<T: 'static + MmuMeta + Copy + Ord + core::hash::Hash + core::fmt::Debug> VmMeta for T {}
 
 #[inline]
 const fn mask(bits: usize) -> usize {
@@ -190,29 +176,16 @@ const fn mask(bits: usize) -> usize {
 }
 
 #[inline]
-const fn ppn_mask(base: usize, len: usize) -> usize {
-    let m0: usize = !mask(base);
-    let m1: usize = mask(base + len);
+const fn ppn_mask<Meta: MmuMeta>() -> usize {
+    let m0: usize = !mask(Meta::PPN_POS);
+    let m1: usize = mask(Meta::PPN_POS + Meta::P_ADDR_BITS - Meta::LEVEL_BITS[0]);
     m0 & m1
 }
 
-use static_assertions::const_assert_eq;
-
-const_assert_eq!(PAGE_SIZE, 4096);
-const_assert_eq!(PAGE_BITS, 12);
-
-cfg_if::cfg_if! {
-    if #[cfg(target_pointer_width = "32")] {
-        const_assert_eq!(PT_LEVEL_BITS, 10);
-        const_assert_eq!(ENTRIES_PER_TABLE, 1024);
-        const_assert_eq!(calculate_max_level(32), 1);
-    } else if #[cfg(target_pointer_width = "64")] {
-        const_assert_eq!(PT_LEVEL_BITS, 9);
-        const_assert_eq!(ENTRIES_PER_TABLE, 512);
-        const_assert_eq!(calculate_max_level(39), 2);
-        const_assert_eq!(calculate_max_level(48), 3);
-        const_assert_eq!(calculate_max_level(57), 4);
-    } else {
-        compile_error!("Unsupported architecture");
+#[inline]
+const fn const_sum(val: usize, bits: &[usize]) -> usize {
+    match bits {
+        [] => val,
+        [n, tail @ ..] => const_sum(val + *n, tail),
     }
 }

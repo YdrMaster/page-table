@@ -1,14 +1,15 @@
-﻿use crate::{mask, PAGE_BITS, PT_LEVEL_BITS, P_ADDR_BITS};
+﻿use crate::{const_sum, mask, VmMeta, P_ADDR_BITS};
 use core::{
+    fmt,
     marker::PhantomData,
     ops::{Add, AddAssign},
 };
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 #[repr(transparent)]
-pub struct PageNumber<S: Space>(usize, PhantomData<S>);
+pub struct PageNumber<Meta: VmMeta, S: Space>(usize, PhantomData<Meta>, PhantomData<S>);
 
-pub trait Space {}
+pub trait Space: Clone + Copy + PartialEq + Eq + PartialOrd + Ord + fmt::Debug {}
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct Physical;
@@ -19,7 +20,7 @@ pub struct Virtual;
 impl Space for Physical {}
 impl Space for Virtual {}
 
-impl<S: Space> PageNumber<S> {
+impl<Meta: VmMeta, S: Space> PageNumber<Meta, S> {
     /// 页号零。
     pub const ZERO: Self = Self::new(0);
 
@@ -28,7 +29,7 @@ impl<S: Space> PageNumber<S> {
 
     #[inline]
     pub const fn new(n: usize) -> Self {
-        Self(n, PhantomData)
+        Self(n, PhantomData, PhantomData)
     }
 
     #[inline]
@@ -37,16 +38,16 @@ impl<S: Space> PageNumber<S> {
     }
 }
 
-impl<S: Space> Add<usize> for PageNumber<S> {
+impl<Meta: VmMeta, S: Space> Add<usize> for PageNumber<Meta, S> {
     type Output = Self;
 
     #[inline]
     fn add(self, rhs: usize) -> Self {
-        Self(self.0.wrapping_add(rhs), PhantomData)
+        Self::new(self.0.wrapping_add(rhs))
     }
 }
 
-impl<S: Space> AddAssign<usize> for PageNumber<S> {
+impl<Meta: VmMeta, S: Space> AddAssign<usize> for PageNumber<Meta, S> {
     #[inline]
     fn add_assign(&mut self, rhs: usize) {
         self.0 = self.0.wrapping_add(rhs);
@@ -54,47 +55,42 @@ impl<S: Space> AddAssign<usize> for PageNumber<S> {
 }
 
 /// 物理页号。
-pub type PPN = PageNumber<Physical>;
+pub type PPN<Meta> = PageNumber<Meta, Physical>;
 
 /// 虚拟页号。
-pub type VPN = PageNumber<Virtual>;
+pub type VPN<Meta> = PageNumber<Meta, Virtual>;
 
-impl PPN {
+impl<Meta: VmMeta> PPN<Meta> {
     /// 最大物理页号。
-    pub const MAX: Self = Self(mask(P_ADDR_BITS - PAGE_BITS), PhantomData);
+    pub const MAX: Self = Self::new(mask(P_ADDR_BITS - Meta::PAGE_BITS));
 }
 
-impl VPN {
+impl<Meta: VmMeta> VPN<Meta> {
     /// 虚页的起始地址。
     #[inline]
-    pub const fn base(self) -> VAddr {
-        VAddr(self.0 << PAGE_BITS)
+    pub const fn base(self) -> VAddr<Meta> {
+        VAddr::new(self.0 << Meta::PAGE_BITS)
     }
 
     /// 虚页在 `level` 级页表中的位置。
     #[inline]
-    pub const fn index_in(self, level: usize) -> usize {
-        (self.0 >> (level * PT_LEVEL_BITS)) & mask(PT_LEVEL_BITS)
-    }
-
-    /// 虚页在 `level` 级页上的偏移。
-    #[inline]
-    pub const fn offset_in(self, level: usize) -> usize {
-        self.0 & mask(level * PT_LEVEL_BITS)
+    pub fn index_in(self, level: usize) -> usize {
+        let base = const_sum(0, &Meta::LEVEL_BITS[1..][..level]);
+        (self.0 >> base) & mask(Meta::LEVEL_BITS[level + 1])
     }
 }
 
 /// 虚拟地址。
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 #[repr(transparent)]
-pub struct VAddr(usize);
+pub struct VAddr<Meta: VmMeta>(usize, PhantomData<Meta>);
 
-impl VAddr {
+impl<Meta: VmMeta> VAddr<Meta> {
     /// 将一个地址值转换为虚拟地址意味着允许虚存方案根据实际情况裁剪地址值。
     /// 超过虚址范围的地址会被裁剪。
     #[inline]
     pub const fn new(value: usize) -> Self {
-        Self(value)
+        Self(value, PhantomData)
     }
 
     /// 将虚地址转化为任意指针。
@@ -119,27 +115,27 @@ impl VAddr {
 
     /// 包括这个虚地址最后页的页号。
     #[inline]
-    pub const fn floor(self) -> VPN {
-        VPN::new(self.0 >> PAGE_BITS)
+    pub const fn floor(self) -> VPN<Meta> {
+        VPN::new(self.0 >> Meta::PAGE_BITS)
     }
 
     /// 不包括这个虚地址的最前页的页号。
     #[inline]
-    pub const fn ceil(self) -> VPN {
-        VPN::new((self.0 + mask(PAGE_BITS)) >> PAGE_BITS)
+    pub const fn ceil(self) -> VPN<Meta> {
+        VPN::new((self.0 + mask(Meta::PAGE_BITS)) >> Meta::PAGE_BITS)
     }
 }
 
-impl From<usize> for VAddr {
+impl<Meta: VmMeta> From<usize> for VAddr<Meta> {
     #[inline]
     fn from(value: usize) -> Self {
-        Self(value)
+        Self::new(value)
     }
 }
 
-impl<T> From<&T> for VAddr {
+impl<Meta: VmMeta, T> From<&T> for VAddr<Meta> {
     #[inline]
     fn from(value: &T) -> Self {
-        Self(value as *const _ as _)
+        Self::new(value as *const _ as _)
     }
 }

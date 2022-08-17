@@ -1,4 +1,4 @@
-﻿use crate::{MmuMeta, Pte, PPN};
+﻿use crate::{Pte, VmMeta, PPN};
 use core::marker::PhantomData;
 
 /// 页表项属性。
@@ -6,9 +6,9 @@ use core::marker::PhantomData;
 /// 页表项属性一定完全包含在页表项中，所以独立的页表项属性实现为一个无法获取地址的页表项。
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(transparent)]
-pub struct MmuFlags<Meta: MmuMeta>(pub usize, PhantomData<Meta>);
+pub struct VmFlags<Meta: VmMeta>(pub usize, PhantomData<Meta>);
 
-impl<Meta: MmuMeta> MmuFlags<Meta> {
+impl<Meta: VmMeta> VmFlags<Meta> {
     /// 所有位为 0 的页表项属性。
     pub const ZERO: Self = Self(0, PhantomData);
 
@@ -80,7 +80,7 @@ impl<Meta: MmuMeta> MmuFlags<Meta> {
 
     /// 构造具有 `self` 页表项属性，并指向 `ppn` 物理页的页表项。
     #[inline]
-    pub fn build_pte(mut self, ppn: PPN) -> Pte<Meta> {
+    pub fn build_pte(mut self, ppn: PPN<Meta>) -> Pte<Meta> {
         Meta::set_ppn(&mut self.0, ppn);
         Pte(self.0, PhantomData)
     }

@@ -1,18 +1,18 @@
-﻿use crate::{MmuFlags, MmuMeta, PPN};
+﻿use crate::{VmFlags, VmMeta, PPN};
 use core::marker::PhantomData;
 
 /// 页表项。
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(transparent)]
-pub struct Pte<Meta: MmuMeta>(pub usize, pub(crate) PhantomData<Meta>);
+pub struct Pte<Meta: VmMeta>(pub usize, pub(crate) PhantomData<Meta>);
 
-impl<Meta: MmuMeta> Pte<Meta> {
+impl<Meta: VmMeta> Pte<Meta> {
     /// 空白页表项。
     pub const ZERO: Self = Self(0, PhantomData);
 
     /// 获取页表项指向的物理页号。
     #[inline]
-    pub fn ppn(self) -> PPN {
+    pub fn ppn(self) -> PPN<Meta> {
         Meta::ppn(self.0)
     }
 
@@ -78,15 +78,15 @@ impl<Meta: MmuMeta> Pte<Meta> {
 
     /// 修改页表项指向的物理页。
     #[inline]
-    pub fn set_ppn(&mut self, ppn: PPN) {
+    pub fn set_ppn(&mut self, ppn: PPN<Meta>) {
         Meta::clear_ppn(&mut self.0);
         Meta::set_ppn(&mut self.0, ppn);
     }
 
     /// 取出页表项属性。
     #[inline]
-    pub fn flags(mut self) -> MmuFlags<Meta> {
+    pub fn flags(mut self) -> VmFlags<Meta> {
         Meta::clear_ppn(&mut self.0);
-        MmuFlags::new(self.0)
+        VmFlags::new(self.0)
     }
 }
