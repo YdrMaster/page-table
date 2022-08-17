@@ -1,12 +1,12 @@
 ﻿cfg_if::cfg_if! {
     if #[cfg(target_pointer_width = "32")] {
         /// 32 位 RISC-V 物理地址位数。
-        pub const P_ADDR_BITS: usize = 34;
+        const P_ADDR_BITS: usize = 34;
         /// RISC-V Sv32 VM Mode.
         pub type Sv32 = Sv<2>;
     } else if #[cfg(target_pointer_width = "64")] {
         /// 64 位 RISC-V 物理地址位数。
-        pub const P_ADDR_BITS: usize = 56;
+        const P_ADDR_BITS: usize = 56;
         /// RISC-V Sv39 VM Mode.
         pub type Sv39 = Sv<3>;
         /// RISC-V Sv48 VM Mode.

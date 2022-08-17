@@ -27,7 +27,7 @@ cfg_if::cfg_if! {
 pub use addr::{VAddr, PPN, VPN};
 pub use arch::*;
 pub use flags::VmFlags;
-pub use page_table::{PageTable, PtQuery};
+pub use page_table::PageTable;
 pub use pte::Pte;
 
 /// 地址转换单元元数据。
@@ -83,6 +83,9 @@ pub trait VmMeta: 'static + MmuMeta + Copy + Ord + core::hash::Hash + core::fmt:
 
     /// 页表最大级别。
     const MAX_LEVEL: usize = Self::LEVEL_BITS.len() - 1;
+
+    /// 页表项中的物理页号掩码。
+    const PPN_MASK: usize = ppn_mask::<Self>();
 
     /// `level` 级页表容纳的页数。
     #[inline]
@@ -151,30 +154,32 @@ pub trait VmMeta: 'static + MmuMeta + Copy + Ord + core::hash::Hash + core::fmt:
     /// 从 PTE 中获得 PPN。
     #[inline]
     fn ppn(value: usize) -> PPN<Self> {
-        PPN::new((value & ppn_mask::<Self>()) >> Self::PPN_POS)
+        PPN::new((value & Self::PPN_MASK) >> Self::PPN_POS)
     }
 
     /// 设置页表项的 ppn。
     #[inline]
     fn set_ppn(value: &mut usize, ppn: PPN<Self>) {
-        *value |= (ppn.val() << Self::PPN_POS) & ppn_mask::<Self>();
+        *value |= (ppn.val() << Self::PPN_POS) & Self::PPN_MASK;
     }
 
     /// 清除页表项中的 ppn。
     #[inline]
     fn clear_ppn(value: &mut usize) {
-        *value &= !ppn_mask::<Self>();
+        *value &= !Self::PPN_MASK;
     }
 }
 
 /// 自动实现。
 impl<T: 'static + MmuMeta + Copy + Ord + core::hash::Hash + core::fmt::Debug> VmMeta for T {}
 
+/// 生成一个 `bits` 位的掩码。
 #[inline]
 const fn mask(bits: usize) -> usize {
     (1 << bits) - 1
 }
 
+/// 计算 pte 中 ppn 的掩码。
 #[inline]
 const fn ppn_mask<Meta: MmuMeta>() -> usize {
     let m0: usize = !mask(Meta::PPN_POS);
@@ -182,6 +187,7 @@ const fn ppn_mask<Meta: MmuMeta>() -> usize {
     m0 & m1
 }
 
+/// 递归求和，可以用在编译期。
 #[inline]
 const fn const_sum(val: usize, bits: &[usize]) -> usize {
     match bits {

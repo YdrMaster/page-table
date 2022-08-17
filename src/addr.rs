@@ -1,4 +1,4 @@
-﻿use crate::{const_sum, mask, VmMeta, P_ADDR_BITS};
+﻿use crate::{mask, VmMeta};
 use core::{
     fmt,
     marker::PhantomData,
@@ -62,10 +62,13 @@ pub type VPN<Meta> = PageNumber<Meta, Virtual>;
 
 impl<Meta: VmMeta> PPN<Meta> {
     /// 最大物理页号。
-    pub const MAX: Self = Self::new(mask(P_ADDR_BITS - Meta::PAGE_BITS));
+    pub const MAX: Self = Self::new(mask(Meta::P_ADDR_BITS - Meta::PAGE_BITS));
 }
 
 impl<Meta: VmMeta> VPN<Meta> {
+    /// 最大虚拟页号。
+    pub const MAX: Self = Self::new(mask(Meta::V_ADDR_BITS - Meta::PAGE_BITS));
+
     /// 虚页的起始地址。
     #[inline]
     pub const fn base(self) -> VAddr<Meta> {
@@ -75,7 +78,7 @@ impl<Meta: VmMeta> VPN<Meta> {
     /// 虚页在 `level` 级页表中的位置。
     #[inline]
     pub fn index_in(self, level: usize) -> usize {
-        let base = const_sum(0, &Meta::LEVEL_BITS[1..][..level]);
+        let base: usize = Meta::LEVEL_BITS[1..][..level].iter().sum();
         (self.0 >> base) & mask(Meta::LEVEL_BITS[level + 1])
     }
 }

@@ -2,7 +2,7 @@
 use core::marker::PhantomData;
 
 /// 页表项。
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[repr(transparent)]
 pub struct Pte<Meta: VmMeta>(pub usize, pub(crate) PhantomData<Meta>);
 
@@ -76,17 +76,10 @@ impl<Meta: VmMeta> Pte<Meta> {
         Meta::is_dirty(self.0)
     }
 
-    /// 修改页表项指向的物理页。
-    #[inline]
-    pub fn set_ppn(&mut self, ppn: PPN<Meta>) {
-        Meta::clear_ppn(&mut self.0);
-        Meta::set_ppn(&mut self.0, ppn);
-    }
-
     /// 取出页表项属性。
     #[inline]
     pub fn flags(mut self) -> VmFlags<Meta> {
         Meta::clear_ppn(&mut self.0);
-        VmFlags::new(self.0)
+        unsafe { VmFlags::from_raw(self.0) }
     }
 }
