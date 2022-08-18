@@ -45,9 +45,9 @@ pub trait MmuMeta {
 
     /// 判断页表项是否有效。
     #[inline]
-    fn is_valid(value: usize) -> bool {
+    fn is_valid(flags: usize) -> bool {
         // 一般都用最低位表示页表有效
-        value & 1 == 1
+        flags & 1 == 1
     }
 
     /// 如果页表项指向物理页，则返回 `true`。
@@ -55,7 +55,13 @@ pub trait MmuMeta {
     /// # NOTE
     ///
     /// 为了分散开销，这个方法的实现不会判断 PTE 是否 valid。
-    fn is_leaf(value: usize) -> bool;
+    fn is_leaf(flags: usize) -> bool;
+
+    /// 格式化特性位。
+    #[inline]
+    fn fmt_flags(f: &mut core::fmt::Formatter, flags: usize) -> core::fmt::Result {
+        write!(f, "{flags:018x}")
+    }
 }
 
 /// 页式虚存元数据。

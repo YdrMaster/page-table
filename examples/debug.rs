@@ -2,7 +2,8 @@
 
 fn main() {
     const SUB_FLAGS: VmFlags<Sv39> = unsafe { VmFlags::from_raw(1) };
-    const ROP_FLAGS: VmFlags<Sv39> = unsafe { VmFlags::from_raw(0b11) };
+    const XRP_FLAGS: VmFlags<Sv39> = unsafe { VmFlags::from_raw(0b1001) };
+    const ROP_FLAGS: VmFlags<Sv39> = unsafe { VmFlags::from_raw(0b0011) };
 
     #[repr(C, align(4096))]
     struct Page([u8; 1 << Sv39::PAGE_BITS]);
@@ -37,6 +38,9 @@ fn main() {
         PageTable::<Sv39>::from_raw_parts(pt2m4.0.as_mut_ptr().cast(), VPN::ZERO, Sv39::MAX_LEVEL)
     };
     for i in 12..18 {
+        pt2m4[i] = XRP_FLAGS.build_pte(PPN::new(0x23300 + i as usize));
+    }
+    for i in 31..40 {
         pt2m4[i] = ROP_FLAGS.build_pte(PPN::new(0x23300 + i as usize));
     }
 
@@ -62,5 +66,17 @@ impl MmuMeta for Sv39 {
     fn is_leaf(value: usize) -> bool {
         const MASK: usize = 0b1110;
         value & MASK != 0
+    }
+
+    fn fmt_flags(f: &mut core::fmt::Formatter, flags: usize) -> core::fmt::Result {
+        const FLAGS: [u8; 8] = [b'V', b'R', b'W', b'X', b'U', b'G', b'A', b'D'];
+        for (i, w) in FLAGS.iter().enumerate().rev() {
+            if (flags >> i) & 1 == 1 {
+                write!(f, "{}", *w as char)?;
+            } else {
+                write!(f, "_")?;
+            }
+        }
+        Ok(())
     }
 }

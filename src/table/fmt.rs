@@ -36,20 +36,24 @@ impl<'f1, 'f2, Meta: VmMeta> Visitor<Meta> for FmtVisitor<'f1, 'f2, Meta> {
             write!(self.f, "{:#018x}", pte.ppn().val()).unwrap();
             // 如果是数据页，还要打印映射到的虚页号和自定义的权限信息
             if pte.is_leaf() {
+                // 对于大页，打印一些线
                 for _ in 0..level {
                     write!(self.f, " - ").unwrap();
                     for _ in 0..18 {
                         write!(self.f, "-").unwrap();
                     }
                 }
+                // 打印映射的虚址范围和自定义的权限位
                 let range = target_hint.vpn.vaddr_range(target_hint.level);
                 write!(
                     self.f,
-                    " {:#018x}..{:#018x}",
+                    " {:#018x}..{:#018x} (",
                     range.start.val(),
                     range.end.val()
                 )
                 .unwrap();
+                Meta::fmt_flags(self.f, pte.flags().0).unwrap();
+                write!(self.f, ")").unwrap();
             } else {
                 self.new_line = false;
                 return target_hint.down();

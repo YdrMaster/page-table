@@ -31,6 +31,18 @@ impl<const N: usize> crate::MmuMeta for Sv<N> {
         const MASK: usize = 0b1110;
         value & MASK != 0
     }
+
+    fn fmt_flags(f: &mut core::fmt::Formatter, flags: usize) -> core::fmt::Result {
+        const FLAGS: [u8; 8] = [b'V', b'R', b'W', b'X', b'U', b'G', b'A', b'D'];
+        for (i, w) in FLAGS.iter().enumerate().rev() {
+            if (flags >> i) & 1 == 1 {
+                write!(f, "{}", *w as char)?;
+            } else {
+                write!(f, "_")?;
+            }
+        }
+        Ok(())
+    }
 }
 
 #[inline]
