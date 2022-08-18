@@ -141,7 +141,7 @@ impl<Meta: VmMeta> fmt::Debug for VPN<Meta> {
 }
 
 /// 虚拟地址。
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
 pub struct VAddr<Meta: VmMeta>(usize, PhantomData<Meta>);
 
@@ -213,6 +213,13 @@ impl<Meta: VmMeta, T> From<&T> for VAddr<Meta> {
     #[inline]
     fn from(value: &T) -> Self {
         Self::new(value as *const _ as _)
+    }
+}
+
+impl<Meta: VmMeta> fmt::Debug for VAddr<Meta> {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "VAddr({:#x})", self.0)
     }
 }
 
