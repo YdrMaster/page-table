@@ -34,48 +34,6 @@ impl<Meta: VmMeta> Pte<Meta> {
         Meta::is_valid(self.0)
     }
 
-    /// 如果页表项指向的页可读，返回 `true`。
-    #[inline]
-    pub fn is_readable(self) -> bool {
-        Meta::is_readable(self.0)
-    }
-
-    /// 如果页表项指向的页可写，返回 `true`。
-    #[inline]
-    pub fn is_writable(self) -> bool {
-        Meta::is_writable(self.0)
-    }
-
-    /// 如果页表项指向的页可执行，返回 `true`。
-    #[inline]
-    pub fn is_executable(self) -> bool {
-        Meta::is_executable(self.0)
-    }
-
-    /// 如果页表项指向的页用户态可访问，返回 `true`。
-    #[inline]
-    pub fn is_user(self) -> bool {
-        Meta::is_user(self.0)
-    }
-
-    /// 如果页表项指向全局页，返回 `true`。
-    #[inline]
-    pub fn is_global(self) -> bool {
-        Meta::is_global(self.0)
-    }
-
-    /// 如果页表项指向的页已访问，返回 `true`。
-    #[inline]
-    pub fn is_accessed(self) -> bool {
-        Meta::is_accessed(self.0)
-    }
-
-    /// 如果页表项指向的页已写，返回 `true`。
-    #[inline]
-    pub fn is_dirty(self) -> bool {
-        Meta::is_dirty(self.0)
-    }
-
     /// 取出页表项属性。
     #[inline]
     pub fn flags(mut self) -> VmFlags<Meta> {

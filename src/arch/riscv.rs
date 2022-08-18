@@ -24,14 +24,6 @@ impl<const N: usize> crate::MmuMeta for Sv<N> {
     const P_ADDR_BITS: usize = P_ADDR_BITS;
     const PAGE_BITS: usize = 12;
     const LEVEL_BITS: &'static [usize] = &[pt_level_bits(Self::PAGE_BITS); N];
-    const FLAG_POS_V: usize = 0;
-    const FLAG_POS_R: usize = 1;
-    const FLAG_POS_W: usize = 2;
-    const FLAG_POS_X: usize = 3;
-    const FLAG_POS_U: usize = 4;
-    const FLAG_POS_G: usize = 5;
-    const FLAG_POS_A: usize = 6;
-    const FLAG_POS_D: usize = 7;
     const PPN_POS: usize = 10;
 
     #[inline]

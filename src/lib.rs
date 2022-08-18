@@ -40,32 +40,15 @@ pub trait MmuMeta {
     /// 各级页内虚地址位数位数。
     const LEVEL_BITS: &'static [usize];
 
-    /// 页表项有效。
-    const FLAG_POS_V: usize;
-
-    /// 页可读。
-    const FLAG_POS_R: usize;
-
-    /// 页可写。
-    const FLAG_POS_W: usize;
-
-    /// 页可执行。
-    const FLAG_POS_X: usize;
-
-    /// 页可用户态访问。
-    const FLAG_POS_U: usize;
-
-    /// 全局页。
-    const FLAG_POS_G: usize;
-
-    /// 页已访问。
-    const FLAG_POS_A: usize;
-
-    /// 页已写。
-    const FLAG_POS_D: usize;
-
     /// 物理页号在 PTE 中的位置。
     const PPN_POS: usize;
+
+    /// 判断页表项是否有效。
+    #[inline]
+    fn is_valid(value: usize) -> bool {
+        // 一般都用最低位表示页表有效
+        value & 1 == 1
+    }
 
     /// 如果页表项指向物理页，则返回 `true`。
     ///
@@ -112,54 +95,6 @@ pub trait VmMeta: 'static + MmuMeta + Copy + Ord + core::hash::Hash + core::fmt:
     #[inline]
     fn is_huge(value: usize, level: usize) -> bool {
         level != 0 && Self::is_leaf(value)
-    }
-
-    /// 判断页表项是否 valid。
-    #[inline]
-    fn is_valid(value: usize) -> bool {
-        value & (1 << Self::FLAG_POS_V) != 0
-    }
-
-    /// 判断页表项是否可读。
-    #[inline]
-    fn is_readable(value: usize) -> bool {
-        value & (1 << Self::FLAG_POS_R) != 0
-    }
-
-    /// 判断页表项是否可写。
-    #[inline]
-    fn is_writable(value: usize) -> bool {
-        value & (1 << Self::FLAG_POS_W) != 0
-    }
-
-    /// 判断页表项是否可执行。
-    #[inline]
-    fn is_executable(value: usize) -> bool {
-        value & (1 << Self::FLAG_POS_X) != 0
-    }
-
-    /// 判断页表项是否用于用户态。
-    #[inline]
-    fn is_user(value: usize) -> bool {
-        value & (1 << Self::FLAG_POS_U) != 0
-    }
-
-    /// 判断页表项是否全局的。
-    #[inline]
-    fn is_global(value: usize) -> bool {
-        value & (1 << Self::FLAG_POS_G) != 0
-    }
-
-    /// 判断页表项是否访问过。
-    #[inline]
-    fn is_accessed(value: usize) -> bool {
-        value & (1 << Self::FLAG_POS_A) != 0
-    }
-
-    /// 判断页表项是否被修改过。
-    #[inline]
-    fn is_dirty(value: usize) -> bool {
-        value & (1 << Self::FLAG_POS_D) != 0
     }
 
     /// 从 PTE 中获得 PPN。
@@ -216,14 +151,6 @@ mod test_meta {
         const P_ADDR_BITS: usize = 56;
         const PAGE_BITS: usize = 12;
         const LEVEL_BITS: &'static [usize] = &[9; 3];
-        const FLAG_POS_V: usize = 0;
-        const FLAG_POS_R: usize = 1;
-        const FLAG_POS_W: usize = 2;
-        const FLAG_POS_X: usize = 3;
-        const FLAG_POS_U: usize = 4;
-        const FLAG_POS_G: usize = 5;
-        const FLAG_POS_A: usize = 6;
-        const FLAG_POS_D: usize = 7;
         const PPN_POS: usize = 10;
 
         #[inline]

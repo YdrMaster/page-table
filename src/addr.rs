@@ -189,6 +189,12 @@ impl<Meta: VmMeta> VAddr<Meta> {
         self.0 as _
     }
 
+    /// 虚地址值。
+    #[inline]
+    pub const fn val(self) -> usize {
+        self.0
+    }
+
     /// 包括这个虚地址最后页的页号。
     #[inline]
     pub const fn floor(self) -> VPN<Meta> {
