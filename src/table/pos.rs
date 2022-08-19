@@ -27,7 +27,7 @@ impl<Meta: VmMeta> Pos<Meta> {
     pub const fn stop() -> Self {
         Self {
             vpn: VPN::ZERO,
-            level: usize::MAX,
+            level: Meta::MAX_LEVEL + 1,
             _phantom: PhantomData,
         }
     }

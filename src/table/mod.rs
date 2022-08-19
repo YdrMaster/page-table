@@ -26,6 +26,7 @@ impl<Meta: VmMeta> PageTable<Meta> {
     #[inline]
     pub unsafe fn from_raw_parts(ptr: *mut Pte<Meta>, base: VPN<Meta>, level: usize) -> Self {
         Self {
+            // 显然需要 level <= Meta::MAX_LEVEL
             mem: core::slice::from_raw_parts_mut(ptr, 1 << Meta::LEVEL_BITS[level]),
             base: base.floor(level),
             level,

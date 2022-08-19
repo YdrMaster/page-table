@@ -67,8 +67,13 @@ pub type PPN<Meta> = PageNumber<Meta, Physical>;
 pub type VPN<Meta> = PageNumber<Meta, Virtual>;
 
 impl<Meta: VmMeta> PPN<Meta> {
+    /// 无效的物理页号，作为 NULL 使用。
+    ///
+    /// 显然，物理页号不可能和 usize 一样长，所以可以这样操作。
+    pub const INVALID: Self = Self::new(1 << (Meta::P_ADDR_BITS - Meta::PAGE_BITS));
+
     /// 最大物理页号。
-    pub const MAX: Self = Self::new(mask(Meta::P_ADDR_BITS - Meta::PAGE_BITS));
+    pub const MAX: Self = Self::new(Self::INVALID.val() - 1);
 }
 
 impl<Meta: VmMeta> fmt::Debug for PPN<Meta> {
@@ -137,6 +142,33 @@ impl<Meta: VmMeta> VPN<Meta> {
 impl<Meta: VmMeta> fmt::Debug for VPN<Meta> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "VPN({:#x})", self.0)
+    }
+}
+
+/// 一个可能无效的物理页号。
+pub struct MaybeInvalidPPN<Meta: VmMeta>(PPN<Meta>);
+
+impl<Meta: VmMeta> MaybeInvalidPPN<Meta> {
+    /// 从一个物理页号新建。
+    #[inline]
+    pub const fn new(n: PPN<Meta>) -> Self {
+        Self(n)
+    }
+
+    /// 新建一个无效物理页号。
+    #[inline]
+    pub const fn invalid() -> Self {
+        Self(PPN::INVALID)
+    }
+
+    /// 取出物理页号。
+    #[inline]
+    pub const fn get(&self) -> Option<PPN<Meta>> {
+        if self.0.val() > PPN::<Meta>::MAX.val() {
+            None
+        } else {
+            Some(self.0)
+        }
     }
 }
 

@@ -2,6 +2,18 @@
 use crate::{Pte, VmMeta, PPN, VPN};
 use core::{fmt, marker::PhantomData};
 
+impl<Meta: VmMeta, F: Fn(PPN<Meta>) -> VPN<Meta>> fmt::Debug for PageTableShuttle<Meta, F> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.walk(FmtVisitor {
+            f,
+            max_level: 0,
+            new_line: true,
+            _phantom: PhantomData,
+        });
+        Ok(())
+    }
+}
+
 struct FmtVisitor<'f1, 'f2, Meta: VmMeta> {
     f: &'f1 mut fmt::Formatter<'f2>,
     max_level: usize,
@@ -74,17 +86,5 @@ impl<'f1, 'f2, Meta: VmMeta> Visitor<Meta> for FmtVisitor<'f1, 'f2, Meta> {
     fn meet(&mut self, _level: usize, _pte: Pte<Meta>, _target_hint: Pos<Meta>) -> Pos<Meta> {
         // 不会跳着遍历
         unreachable!()
-    }
-}
-
-impl<Meta: VmMeta, F: Fn(PPN<Meta>) -> VPN<Meta> + Clone> fmt::Debug for PageTableShuttle<Meta, F> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.walk(FmtVisitor {
-            f,
-            max_level: 0,
-            new_line: true,
-            _phantom: PhantomData,
-        });
-        Ok(())
     }
 }

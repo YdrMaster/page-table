@@ -16,7 +16,3 @@ categories = ["no-std"]
 [dependencies]
 cfg-if = "1.0.0"
 static_assertions = "1.1.0"
-
-[profile.dev]
-debug = true
-opt-level = 0
