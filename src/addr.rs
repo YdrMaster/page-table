@@ -146,6 +146,8 @@ impl<Meta: VmMeta> fmt::Debug for VPN<Meta> {
 }
 
 /// 一个可能无效的物理页号。
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[repr(transparent)]
 pub struct MaybeInvalidPPN<Meta: VmMeta>(PPN<Meta>);
 
 impl<Meta: VmMeta> MaybeInvalidPPN<Meta> {
