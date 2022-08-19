@@ -77,7 +77,7 @@ impl<'f1, 'f2, Meta: VmMeta> Visitor<Meta> for FmtVisitor<'f1, 'f2, Meta> {
         // 如果打印了一个数据页或下一个位置是更高级页，换行
         if pte.is_valid() || (!self.new_line && next_level > level) {
             self.new_line = true;
-            writeln!(self.f, "").unwrap();
+            writeln!(self.f).unwrap();
         }
         Pos::new(vpn, next_level)
     }
