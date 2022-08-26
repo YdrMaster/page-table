@@ -1,5 +1,5 @@
 ﻿use crate::{VmMeta, VPN};
-use core::{fmt, marker::PhantomData};
+use core::fmt;
 
 /// `Meta` 方案中页表上的一个位置。
 #[derive(Clone, Copy)]
@@ -8,18 +8,13 @@ pub struct Pos<Meta: VmMeta> {
     pub vpn: VPN<Meta>,
     /// 目标页表项的级别。
     pub level: usize,
-    _phantom: PhantomData<Meta>,
 }
 
 impl<Meta: VmMeta> Pos<Meta> {
     /// 新建目标。
     #[inline]
     pub const fn new(vpn: VPN<Meta>, level: usize) -> Self {
-        Self {
-            vpn,
-            level,
-            _phantom: PhantomData,
-        }
+        Self { vpn, level }
     }
 
     /// 结束遍历。
@@ -28,7 +23,6 @@ impl<Meta: VmMeta> Pos<Meta> {
         Self {
             vpn: VPN::ZERO,
             level: Meta::MAX_LEVEL + 1,
-            _phantom: PhantomData,
         }
     }
 

@@ -6,7 +6,7 @@ use crate::{Pte, VmMeta, VPN};
 use core::ops::{Index, IndexMut, Range};
 
 pub use pos::Pos;
-pub use shuttle::{PageTableShuttle, Update, Visitor, VisitorMut};
+pub use shuttle::{Decorator, PageTableShuttle, Update, Visitor};
 
 /// 页表。
 ///

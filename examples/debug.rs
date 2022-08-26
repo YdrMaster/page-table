@@ -50,7 +50,7 @@ fn main() {
             table: root,
             f: |ppn| VPN::new(ppn.val())
         }
-    )
+    );
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]

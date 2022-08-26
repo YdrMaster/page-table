@@ -77,6 +77,7 @@ impl<Meta: VmMeta> PPN<Meta> {
 }
 
 impl<Meta: VmMeta> fmt::Debug for PPN<Meta> {
+    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "PPN({:#x})", self.0)
     }
@@ -140,6 +141,7 @@ impl<Meta: VmMeta> VPN<Meta> {
 }
 
 impl<Meta: VmMeta> fmt::Debug for VPN<Meta> {
+    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "VPN({:#x})", self.0)
     }

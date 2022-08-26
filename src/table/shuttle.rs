@@ -21,7 +21,7 @@ impl<Meta: VmMeta, F: Fn(PPN<Meta>) -> VPN<Meta>> PageTableShuttle<Meta, F> {
 
     /// 使用访问器 `visitor` 遍历并修改页表。
     #[inline]
-    pub fn walk_mut(&mut self, mut visitor: impl VisitorMut<Meta>) {
+    pub fn walk_mut(&mut self, mut visitor: impl Decorator<Meta>) {
         // 先用空的东西把转换函数换出来以规避借用检查
         // FIXME 这能写成 safe 的吗？直接传引用会在递归时产生无限引用。
         use core::mem::{replace, MaybeUninit};
@@ -78,7 +78,7 @@ fn walk_inner<Meta: VmMeta, F: Fn(PPN<Meta>) -> VPN<Meta>>(
 fn walk_inner_mut<Meta: VmMeta, F: Fn(PPN<Meta>) -> VPN<Meta>>(
     table: &mut PageTable<Meta>,
     mut f: F,
-    visitor: &mut impl VisitorMut<Meta>,
+    visitor: &mut impl Decorator<Meta>,
     target: &mut Pos<Meta>,
 ) -> F {
     let range = table.range();
@@ -150,7 +150,7 @@ pub trait Visitor<Meta: VmMeta> {
 }
 
 /// `Meta` 方案的页表访问机制。
-pub trait VisitorMut<Meta: VmMeta> {
+pub trait Decorator<Meta: VmMeta> {
     /// 出发时调用一次以设置第一个目标。
     ///
     /// `pos` 是页表上最高级别的第一个页的位置。
