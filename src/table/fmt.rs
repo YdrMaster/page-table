@@ -6,7 +6,7 @@ use core::{fmt, marker::PhantomData};
 impl<Meta: VmMeta, F: Fn(PPN<Meta>) -> VPN<Meta>> fmt::Debug
 for PageTableShuttle<Meta, F> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.walk(FmtVisitor {
+        self.walk(&mut FmtVisitor {
             f,
             max_level: 0,
             new_line: true,

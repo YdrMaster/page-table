@@ -14,14 +14,14 @@ pub struct PageTableShuttle<Meta: VmMeta, F: Fn(PPN<Meta>) -> VPN<Meta>> {
 impl<Meta: VmMeta, F: Fn(PPN<Meta>) -> VPN<Meta>> PageTableShuttle<Meta, F> {
     /// 使用访问器 `visitor` 遍历页表。
     #[inline]
-    pub fn walk(&self, mut visitor: impl Visitor<Meta>) {
+    pub fn walk(&self, visitor: &mut impl Visitor<Meta>) {
         let mut target = visitor.start(Pos::new(self.table.base, self.table.level));
-        walk_inner(&self.table, &self.f, &mut visitor, &mut target);
+        walk_inner(&self.table, &self.f, visitor, &mut target);
     }
 
     /// 使用访问器 `visitor` 遍历并修改页表。
     #[inline]
-    pub fn walk_mut(&mut self, mut visitor: impl Decorator<Meta>) {
+    pub fn walk_mut(&mut self, visitor: &mut impl Decorator<Meta>) {
         // 先用空的东西把转换函数换出来以规避借用检查
         // FIXME 这能写成 safe 的吗？直接传引用会在递归时产生无限引用。
         use core::mem::{replace, MaybeUninit};
@@ -29,7 +29,7 @@ impl<Meta: VmMeta, F: Fn(PPN<Meta>) -> VPN<Meta>> PageTableShuttle<Meta, F> {
         let f = replace(&mut self.f, unsafe { MaybeUninit::uninit().assume_init() });
         // 递归遍历，并在结束时把转换函数换回去
         let mut target = visitor.start(Pos::new(self.table.base, self.table.level));
-        self.f = walk_inner_mut(&mut self.table, f, &mut visitor, &mut target);
+        self.f = walk_inner_mut(&mut self.table, f, visitor, &mut target);
     }
 }
 

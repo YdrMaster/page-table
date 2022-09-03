@@ -1,4 +1,8 @@
-﻿cfg_if::cfg_if! {
+﻿use core::str::FromStr;
+
+use crate::VmFlags;
+
+cfg_if::cfg_if! {
     if #[cfg(target_pointer_width = "32")] {
         /// 32 位 RISC-V 物理地址位数。
         const P_ADDR_BITS: usize = 34;
@@ -32,8 +36,8 @@ impl<const N: usize> crate::MmuMeta for Sv<N> {
         value & MASK != 0
     }
 
+    #[inline]
     fn fmt_flags(f: &mut core::fmt::Formatter, flags: usize) -> core::fmt::Result {
-        const FLAGS: [u8; 8] = [b'V', b'R', b'W', b'X', b'U', b'G', b'A', b'D'];
         for (i, w) in FLAGS.iter().enumerate().rev() {
             if (flags >> i) & 1 == 1 {
                 write!(f, "{}", *w as char)?;
@@ -42,6 +46,22 @@ impl<const N: usize> crate::MmuMeta for Sv<N> {
             }
         }
         Ok(())
+    }
+}
+const FLAGS: [u8; 8] = [b'V', b'R', b'W', b'X', b'U', b'G', b'A', b'D'];
+
+impl<const N: usize> FromStr for VmFlags<Sv<N>> {
+    type Err = ();
+
+    #[inline]
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let flags = s
+            .bytes()
+            .filter(|c| c.is_ascii_alphabetic())
+            .map(|c| c.to_ascii_uppercase())
+            .filter_map(|c| FLAGS.iter().position(|x| *x == c))
+            .fold(0, |c, i| c | (1 << i));
+        Ok(unsafe { VmFlags::from_raw(flags) })
     }
 }
 
