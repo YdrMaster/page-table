@@ -198,11 +198,23 @@ impl<Meta: VmMeta> AddAssign<usize> for VAddr<Meta> {
 }
 
 impl<Meta: VmMeta> VAddr<Meta> {
+    const IGNORED_MASK: usize = mask(Meta::V_ADDR_BITS - 1);
+
     /// 将一个地址值转换为虚拟地址意味着允许虚存方案根据实际情况裁剪地址值。
     /// 超过虚址范围的地址会被裁剪。
     #[inline]
     pub const fn new(value: usize) -> Self {
-        Self(value, PhantomData)
+        Self(value & mask(Meta::V_ADDR_BITS), PhantomData)
+    }
+
+    /// 虚地址值。
+    #[inline]
+    pub const fn val(self) -> usize {
+        if self.0 <= Self::IGNORED_MASK {
+            self.0
+        } else {
+            self.0 | !Self::IGNORED_MASK
+        }
     }
 
     /// 将虚地址转化为任意指针。
@@ -212,7 +224,7 @@ impl<Meta: VmMeta> VAddr<Meta> {
     /// 调用者需要确保虚地址在当前地址空间中。
     #[inline]
     pub const unsafe fn as_ptr<T>(self) -> *const T {
-        self.0 as _
+        self.val() as _
     }
 
     /// 将虚地址转化为任意可变指针。
@@ -222,13 +234,7 @@ impl<Meta: VmMeta> VAddr<Meta> {
     /// 调用者需要确保虚地址在当前地址空间中。
     #[inline]
     pub unsafe fn as_mut_ptr<T>(self) -> *mut T {
-        self.0 as _
-    }
-
-    /// 虚地址值。
-    #[inline]
-    pub const fn val(self) -> usize {
-        self.0
+        self.val() as _
     }
 
     /// 包括这个虚地址最后页的页号。
@@ -241,6 +247,12 @@ impl<Meta: VmMeta> VAddr<Meta> {
     #[inline]
     pub const fn ceil(self) -> VPN<Meta> {
         VPN::new((self.0 + mask(Meta::PAGE_BITS)) >> Meta::PAGE_BITS)
+    }
+
+    /// 页内偏移。
+    #[inline]
+    pub const fn offset(self) -> usize {
+        self.0 & mask(Meta::PAGE_BITS)
     }
 }
 

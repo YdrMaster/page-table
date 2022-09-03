@@ -50,6 +50,38 @@ impl<const N: usize> crate::MmuMeta for Sv<N> {
 }
 const FLAGS: [u8; 8] = [b'V', b'R', b'W', b'X', b'U', b'G', b'A', b'D'];
 
+impl<const N: usize> VmFlags<Sv<N>> {
+    /// 从字符串构造页属性。
+    ///
+    /// 编译期版本。
+    #[inline]
+    pub const fn build_from_str(s: &str) -> Self {
+        unsafe { Self::from_raw(Self::build_from_str_internal(0, s.as_bytes())) }
+    }
+
+    const fn build_from_str_internal(mut base: usize, s: &[u8]) -> usize {
+        match s {
+            [c, tail @ ..] => {
+                if c.is_ascii_alphabetic() {
+                    base |= match c {
+                        b'V' | b'v' => 1 << 0,
+                        b'R' | b'r' => 1 << 1,
+                        b'W' | b'w' => 1 << 2,
+                        b'X' | b'x' => 1 << 3,
+                        b'U' | b'u' => 1 << 4,
+                        b'G' | b'g' => 1 << 5,
+                        b'A' | b'a' => 1 << 6,
+                        b'D' | b'd' => 1 << 7,
+                        _ => 0,
+                    }
+                }
+                Self::build_from_str_internal(base, tail)
+            }
+            [] => base,
+        }
+    }
+}
+
 impl<const N: usize> FromStr for VmFlags<Sv<N>> {
     type Err = ();
 
