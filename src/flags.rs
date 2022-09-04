@@ -1,12 +1,15 @@
 ﻿use crate::{Pte, VmMeta, PPN};
-use core::marker::PhantomData;
+use core::{
+    marker::PhantomData,
+    ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign},
+};
 
 /// 页表项属性。
 ///
 /// 页表项属性一定完全包含在页表项中，所以独立的页表项属性实现为一个无法获取地址的页表项。
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(transparent)]
-pub struct VmFlags<Meta: VmMeta>(pub usize, PhantomData<Meta>);
+pub struct VmFlags<Meta: VmMeta>(usize, PhantomData<Meta>);
 
 impl<Meta: VmMeta> VmFlags<Meta> {
     /// 将 `raw` 整数转化为一个页表项属性。
@@ -17,6 +20,18 @@ impl<Meta: VmMeta> VmFlags<Meta> {
     #[inline]
     pub const unsafe fn from_raw(raw: usize) -> Self {
         Self(raw, PhantomData)
+    }
+
+    /// 取出值。
+    #[inline]
+    pub const fn val(self) -> usize {
+        self.0
+    }
+
+    /// 判断是否包含所有指定的位。
+    #[inline]
+    pub const fn contains(self, flags: VmFlags<Meta>) -> bool {
+        self.0 & flags.0 == flags.0
     }
 
     /// 如果页表项指向一个页而非子页表，返回 `true`。
@@ -42,5 +57,53 @@ impl<Meta: VmMeta> VmFlags<Meta> {
     pub fn build_pte(mut self, ppn: PPN<Meta>) -> Pte<Meta> {
         Meta::set_ppn(&mut self.0, ppn);
         Pte(self.0, PhantomData)
+    }
+}
+
+impl<Meta: VmMeta> BitAnd for VmFlags<Meta> {
+    type Output = Self;
+
+    #[inline]
+    fn bitand(self, rhs: Self) -> Self::Output {
+        Self(self.0 & rhs.0, PhantomData)
+    }
+}
+
+impl<Meta: VmMeta> BitOr for VmFlags<Meta> {
+    type Output = Self;
+
+    #[inline]
+    fn bitor(self, rhs: Self) -> Self::Output {
+        Self(self.0 | rhs.0, PhantomData)
+    }
+}
+
+impl<Meta: VmMeta> BitXor for VmFlags<Meta> {
+    type Output = Self;
+
+    #[inline]
+    fn bitxor(self, rhs: Self) -> Self::Output {
+        Self(self.0 ^ rhs.0, PhantomData)
+    }
+}
+
+impl<Meta: VmMeta> BitAndAssign for VmFlags<Meta> {
+    #[inline]
+    fn bitand_assign(&mut self, rhs: Self) {
+        self.0 &= rhs.0;
+    }
+}
+
+impl<Meta: VmMeta> BitOrAssign for VmFlags<Meta> {
+    #[inline]
+    fn bitor_assign(&mut self, rhs: Self) {
+        self.0 |= rhs.0;
+    }
+}
+
+impl<Meta: VmMeta> BitXorAssign for VmFlags<Meta> {
+    #[inline]
+    fn bitxor_assign(&mut self, rhs: Self) {
+        self.0 ^= rhs.0;
     }
 }

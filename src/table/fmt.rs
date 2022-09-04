@@ -66,7 +66,7 @@ impl<'f1, 'f2, Meta: VmMeta> Visitor<Meta> for FmtVisitor<'f1, 'f2, Meta> {
                     range.end.val()
                 )
                 .unwrap();
-                Meta::fmt_flags(self.f, pte.flags().0).unwrap();
+                Meta::fmt_flags(self.f, pte.flags().val()).unwrap();
                 write!(self.f, ")").unwrap();
             } else {
                 self.new_line = false;
