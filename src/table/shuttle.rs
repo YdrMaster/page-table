@@ -1,5 +1,6 @@
 ﻿use super::Pos;
 use crate::{PageTable, Pte, VmMeta, PPN, VPN};
+use core::ptr::NonNull;
 
 /// 页表穿梭机。
 ///
@@ -54,7 +55,7 @@ fn walk_inner<Meta: VmMeta, F: Fn(PPN<Meta>) -> VPN<Meta>>(
             if pte.is_valid() && !pte.is_leaf() {
                 let table = unsafe {
                     PageTable::from_raw_parts(
-                        f(pte.ppn()).base().as_mut_ptr(),
+                        NonNull::new_unchecked(f(pte.ppn()).base().as_mut_ptr()),
                         range.start + index * Meta::pages_in_table(level - 1),
                         level - 1,
                     )
@@ -95,7 +96,7 @@ fn walk_inner_mut<Meta: VmMeta, F: Fn(PPN<Meta>) -> VPN<Meta>>(
             if pte.is_valid() && !pte.is_leaf() {
                 let mut table = unsafe {
                     PageTable::from_raw_parts(
-                        f(pte.ppn()).base().as_mut_ptr(),
+                        NonNull::new_unchecked(f(pte.ppn()).base().as_mut_ptr()),
                         range.start + index * Meta::pages_in_table(level - 1),
                         level - 1,
                     )
@@ -112,7 +113,7 @@ fn walk_inner_mut<Meta: VmMeta, F: Fn(PPN<Meta>) -> VPN<Meta>>(
                         *pte = new;
                         let mut table = unsafe {
                             PageTable::from_raw_parts(
-                                vpn.base().as_mut_ptr(),
+                                NonNull::new_unchecked(vpn.base().as_mut_ptr()),
                                 range.start + index * Meta::pages_in_table(level - 1),
                                 level - 1,
                             )

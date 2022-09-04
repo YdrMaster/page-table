@@ -3,7 +3,10 @@ mod pos;
 mod shuttle;
 
 use crate::{Pte, VmMeta, VPN};
-use core::ops::{Index, IndexMut, Range};
+use core::{
+    ops::{Index, IndexMut, Range},
+    ptr::NonNull,
+};
 
 pub use pos::Pos;
 pub use shuttle::{Decorator, PageTableShuttle, Update, Visitor};
@@ -24,13 +27,23 @@ impl<Meta: VmMeta> PageTable<Meta> {
     ///
     /// 同 [from_raw_parts_mut](core::slice::from_raw_parts_mut).
     #[inline]
-    pub unsafe fn from_raw_parts(ptr: *mut Pte<Meta>, base: VPN<Meta>, level: usize) -> Self {
+    pub unsafe fn from_raw_parts(ptr: NonNull<Pte<Meta>>, base: VPN<Meta>, level: usize) -> Self {
         Self {
             // 显然需要 level <= Meta::MAX_LEVEL
-            mem: core::slice::from_raw_parts_mut(ptr, 1 << Meta::LEVEL_BITS[level]),
+            mem: core::slice::from_raw_parts_mut(ptr.as_ptr(), 1 << Meta::LEVEL_BITS[level]),
             base: base.floor(level),
             level,
         }
+    }
+
+    /// 从指向根页表的指针创建页表。
+    ///
+    /// # Safety
+    ///
+    /// 同 [from_raw_parts_mut](core::slice::from_raw_parts_mut).
+    #[inline]
+    pub unsafe fn from_root(root: NonNull<Pte<Meta>>) -> Self {
+        Self::from_raw_parts(root, VPN::ZERO, Meta::MAX_LEVEL)
     }
 
     /// 获取指向第一个页表项的指针。
