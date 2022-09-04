@@ -1,10 +1,10 @@
-﻿use page_table::{MmuMeta, PageTable, PageTableShuttle, VmFlags, VmMeta, PPN, VPN};
+﻿use page_table::{MmuMeta, PageTable, PageTableFormatter, VmFlags, VmMeta, PPN, VPN};
 use std::ptr::NonNull;
 
-/// 按 Sv39 的方案修饰用户态指针有概率出问题。需要重写测例，支持更好的虚拟化。
+/// 按 Sv39 的方案修饰任意架构的用户态指针有概率出问题。需要重写测例，支持更好的虚拟化。
 fn main() {
     const SUB_FLAGS: VmFlags<Sv39> = unsafe { VmFlags::from_raw(1) };
-    const XRP_FLAGS: VmFlags<Sv39> = unsafe { VmFlags::from_raw(0b1001) };
+    const XRP_FLAGS: VmFlags<Sv39> = unsafe { VmFlags::from_raw(0b1011) };
     const ROP_FLAGS: VmFlags<Sv39> = unsafe { VmFlags::from_raw(0b0011) };
 
     #[repr(C, align(4096))]
@@ -60,9 +60,11 @@ fn main() {
 
     println!(
         "{:?}",
-        PageTableShuttle {
-            table: root,
-            f: |ppn| VPN::new(ppn.val())
+        PageTableFormatter {
+            pt: root,
+            f: |ppn| unsafe {
+                NonNull::new_unchecked(VPN::<Sv39>::new(ppn.val()).base().as_mut_ptr())
+            }
         }
     );
 }

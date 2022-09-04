@@ -12,6 +12,12 @@ use core::{
 pub struct VmFlags<Meta: VmMeta>(usize, PhantomData<Meta>);
 
 impl<Meta: VmMeta> VmFlags<Meta> {
+    /// 空页表项属性。
+    pub const ZERO: Self = Self(0, PhantomData);
+
+    /// 表示页表项有效的属性。
+    pub const VALID: Self = Self(Meta::VALID_FLAG, PhantomData);
+
     /// 将 `raw` 整数转化为一个页表项属性。
     ///
     /// # Safety

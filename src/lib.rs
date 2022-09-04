@@ -43,18 +43,22 @@ pub trait MmuMeta {
     /// 物理页号在 PTE 中的位置。
     const PPN_POS: usize;
 
+    /// 表示页表项有效的标志位。
+    ///
+    /// 一般就是最低位。
+    const VALID_FLAG: usize = 1;
+
     /// 判断页表项是否有效。
     #[inline]
     fn is_valid(flags: usize) -> bool {
-        // 一般都用最低位表示页表有效
-        flags & 1 == 1
+        flags & Self::VALID_FLAG == Self::VALID_FLAG
     }
 
     /// 如果页表项指向物理页，则返回 `true`。
     ///
     /// # NOTE
     ///
-    /// 为了分散开销，这个方法的实现不会判断 PTE 是否 valid。
+    /// 为了分散开销，这个方法的实现不会判断页表项是否有效。
     fn is_leaf(flags: usize) -> bool;
 
     /// 格式化特性位。

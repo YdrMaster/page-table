@@ -1,15 +1,17 @@
 ﻿mod fmt;
 mod pos;
-mod shuttle;
+mod visit;
 
 use crate::{Pte, VmMeta, VPN};
 use core::{
     ops::{Index, IndexMut, Range},
     ptr::NonNull,
 };
+use visit::{walk_inner, walk_inner_mut};
 
+pub use fmt::PageTableFormatter;
 pub use pos::Pos;
-pub use shuttle::{Decorator, PageTableShuttle, Update, Visitor};
+pub use visit::{Decorator, Update, Visitor};
 
 /// 页表。
 ///
@@ -62,6 +64,18 @@ impl<Meta: VmMeta> PageTable<Meta> {
     #[inline]
     pub fn range(&self) -> Range<VPN<Meta>> {
         self.base..self.base + Meta::pages_in_table(self.level)
+    }
+
+    /// 使用访问器 `visitor` 遍历页表。
+    #[inline]
+    pub fn walk(&self, mut target: Pos<Meta>, visitor: &mut impl Visitor<Meta>) {
+        walk_inner(self, visitor, &mut target);
+    }
+
+    /// 使用访问器 `visitor` 遍历并修改页表。
+    #[inline]
+    pub fn walk_mut(&mut self, mut target: Pos<Meta>, visitor: &mut impl Decorator<Meta>) {
+        walk_inner_mut(self, visitor, &mut target);
     }
 }
 
