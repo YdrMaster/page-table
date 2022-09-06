@@ -1,7 +1,7 @@
 [package]
 name = "page-table"
 description = "Encapsulation of the page table for common architectures."
-version = "0.0.5"
+version = "0.0.6"
 edition = "2021"
 authors = ["YdrMaster <ydrml@hotmail.com>"]
 repository = "https://github.com/YdrMaster/page-table.git"
